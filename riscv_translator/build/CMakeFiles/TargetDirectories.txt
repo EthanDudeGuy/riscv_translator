@@ -1,0 +1,3 @@
+/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles/translator.dir
+/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles/edit_cache.dir
+/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles/rebuild_cache.dir
