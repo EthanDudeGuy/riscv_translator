@@ -230,8 +230,37 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
   /usr/include/c++/11/bits/codecvt.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
-  /usr/include/c++/11/bits/fstream.tcc
+  /usr/include/c++/11/bits/fstream.tcc \
+  /usr/include/fcntl.h \
+  /usr/include/x86_64-linux-gnu/bits/fcntl.h \
+  /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h \
+  /usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h \
+  /usr/include/linux/falloc.h \
+  /usr/include/x86_64-linux-gnu/bits/stat.h \
+  /usr/include/x86_64-linux-gnu/bits/struct_stat.h \
+  /usr/include/unistd.h \
+  /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
+  /usr/include/x86_64-linux-gnu/bits/environments.h \
+  /usr/include/x86_64-linux-gnu/bits/confname.h \
+  /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
+  /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
+  /usr/include/x86_64-linux-gnu/bits/unistd_ext.h \
+  /usr/include/linux/close_range.h
 
+
+/usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
+
+/usr/include/x86_64-linux-gnu/bits/getopt_posix.h:
+
+/usr/include/x86_64-linux-gnu/bits/environments.h:
+
+/usr/include/x86_64-linux-gnu/bits/posix_opt.h:
+
+/usr/include/linux/falloc.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h:
+
+/usr/include/fcntl.h:
 
 /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h:
 
@@ -240,6 +269,8 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 /usr/include/c++/11/bits/stl_bvector.h:
 
 /usr/include/c++/11/bits/stl_uninitialized.h:
+
+/usr/include/x86_64-linux-gnu/bits/getopt_core.h:
 
 /usr/include/c++/11/vector:
 
@@ -313,6 +344,8 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 
 /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
 
+/usr/include/x86_64-linux-gnu/bits/fcntl-linux.h:
+
 /usr/include/x86_64-linux-gnu/bits/timex.h:
 
 /usr/include/time.h:
@@ -340,6 +373,8 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 /usr/include/c++/11/bits/ostream.tcc:
 
 /usr/include/c++/11/clocale:
+
+/usr/include/x86_64-linux-gnu/bits/stat.h:
 
 /usr/include/x86_64-linux-gnu/c++/11/bits/c++locale.h:
 
@@ -507,7 +542,11 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 
 /usr/include/c++/11/bits/stl_iterator_base_funcs.h:
 
+/usr/include/x86_64-linux-gnu/bits/confname.h:
+
 /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h:
+
+/usr/include/unistd.h:
 
 /usr/include/x86_64-linux-gnu/sys/select.h:
 
@@ -589,6 +628,8 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 
 /usr/include/c++/11/bits/stl_pair.h:
 
+/usr/include/x86_64-linux-gnu/bits/fcntl.h:
+
 /usr/include/c++/11/bits/stl_function.h:
 
 /usr/include/c++/11/bits/fstream.tcc:
@@ -661,6 +702,8 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 
 /usr/include/c++/11/type_traits:
 
+/usr/include/linux/close_range.h:
+
 /usr/include/c++/11/debug/assertions.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h:
@@ -680,6 +723,8 @@ CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp \
 /usr/include/c++/11/bits/stringfwd.h:
 
 /usr/include/c++/11/bits/memoryfwd.h:
+
+/usr/include/x86_64-linux-gnu/bits/struct_stat.h:
 
 /usr/include/c++/11/iostream:
 
