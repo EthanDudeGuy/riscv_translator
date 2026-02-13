@@ -69,28 +69,28 @@ include CMakeFiles/translator.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/translator.dir/flags.make
 
-CMakeFiles/translator.dir/main.cpp.o: CMakeFiles/translator.dir/flags.make
-CMakeFiles/translator.dir/main.cpp.o: ../main.cpp
-CMakeFiles/translator.dir/main.cpp.o: CMakeFiles/translator.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/translator.dir/main.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/translator.dir/main.cpp.o -MF CMakeFiles/translator.dir/main.cpp.o.d -o CMakeFiles/translator.dir/main.cpp.o -c /home/enemery/riscv_cemu/riscv_translator/main.cpp
+CMakeFiles/translator.dir/generate_c.cpp.o: CMakeFiles/translator.dir/flags.make
+CMakeFiles/translator.dir/generate_c.cpp.o: ../generate_c.cpp
+CMakeFiles/translator.dir/generate_c.cpp.o: CMakeFiles/translator.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/translator.dir/generate_c.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/translator.dir/generate_c.cpp.o -MF CMakeFiles/translator.dir/generate_c.cpp.o.d -o CMakeFiles/translator.dir/generate_c.cpp.o -c /home/enemery/riscv_cemu/riscv_translator/generate_c.cpp
 
-CMakeFiles/translator.dir/main.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/translator.dir/main.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/enemery/riscv_cemu/riscv_translator/main.cpp > CMakeFiles/translator.dir/main.cpp.i
+CMakeFiles/translator.dir/generate_c.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/translator.dir/generate_c.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/enemery/riscv_cemu/riscv_translator/generate_c.cpp > CMakeFiles/translator.dir/generate_c.cpp.i
 
-CMakeFiles/translator.dir/main.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/translator.dir/main.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/enemery/riscv_cemu/riscv_translator/main.cpp -o CMakeFiles/translator.dir/main.cpp.s
+CMakeFiles/translator.dir/generate_c.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/translator.dir/generate_c.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/enemery/riscv_cemu/riscv_translator/generate_c.cpp -o CMakeFiles/translator.dir/generate_c.cpp.s
 
 # Object files for target translator
 translator_OBJECTS = \
-"CMakeFiles/translator.dir/main.cpp.o"
+"CMakeFiles/translator.dir/generate_c.cpp.o"
 
 # External object files for target translator
 translator_EXTERNAL_OBJECTS =
 
-translator: CMakeFiles/translator.dir/main.cpp.o
+translator: CMakeFiles/translator.dir/generate_c.cpp.o
 translator: CMakeFiles/translator.dir/build.make
 translator: /home/enemery/riscv_cemu/capstone/install_dir/lib/libcapstone.a
 translator: CMakeFiles/translator.dir/link.txt

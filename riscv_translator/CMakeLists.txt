@@ -10,7 +10,7 @@ set(capstone_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../capstone/install_dir/lib/cmake/
 find_package(capstone REQUIRED CONFIG)
 
 # 3. Add your executable
-add_executable(translator main.cpp)
+add_executable(translator generate_c.cpp)
 
 # 4. Link using the variables Capstone defines (fallback if target fails)
 if(TARGET capstone::capstone)

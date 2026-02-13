@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/translator.dir/main.cpp.o -o translator  /home/enemery/riscv_cemu/capstone/install_dir/lib/libcapstone.a 
+/usr/bin/c++ CMakeFiles/translator.dir/generate_c.cpp.o -o translator  /home/enemery/riscv_cemu/capstone/install_dir/lib/libcapstone.a 

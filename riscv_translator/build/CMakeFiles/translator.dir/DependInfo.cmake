@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/enemery/riscv_cemu/riscv_translator/main.cpp" "CMakeFiles/translator.dir/main.cpp.o" "gcc" "CMakeFiles/translator.dir/main.cpp.o.d"
+  "/home/enemery/riscv_cemu/riscv_translator/generate_c.cpp" "CMakeFiles/translator.dir/generate_c.cpp.o" "gcc" "CMakeFiles/translator.dir/generate_c.cpp.o.d"
   )
 
 # Targets to which this target links.

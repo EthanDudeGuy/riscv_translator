@@ -129,29 +129,29 @@ translator/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/build
 .PHONY : translator/fast
 
-main.o: main.cpp.o
-.PHONY : main.o
+generate_c.o: generate_c.cpp.o
+.PHONY : generate_c.o
 
 # target to build an object file
-main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/main.cpp.o
-.PHONY : main.cpp.o
+generate_c.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/generate_c.cpp.o
+.PHONY : generate_c.cpp.o
 
-main.i: main.cpp.i
-.PHONY : main.i
+generate_c.i: generate_c.cpp.i
+.PHONY : generate_c.i
 
 # target to preprocess a source file
-main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/main.cpp.i
-.PHONY : main.cpp.i
+generate_c.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/generate_c.cpp.i
+.PHONY : generate_c.cpp.i
 
-main.s: main.cpp.s
-.PHONY : main.s
+generate_c.s: generate_c.cpp.s
+.PHONY : generate_c.s
 
 # target to generate assembly for a file
-main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/main.cpp.s
-.PHONY : main.cpp.s
+generate_c.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/generate_c.cpp.s
+.PHONY : generate_c.cpp.s
 
 # Help Target
 help:
@@ -162,9 +162,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... translator"
-	@echo "... main.o"
-	@echo "... main.i"
-	@echo "... main.s"
+	@echo "... generate_c.o"
+	@echo "... generate_c.i"
+	@echo "... generate_c.s"
 .PHONY : help
 
 
