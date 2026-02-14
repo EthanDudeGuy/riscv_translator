@@ -70,7 +70,6 @@ void init_memory(const char* elf_path) {
 }
 
 void run_cpu(uint64_t entry_point) {
-    printf("run cpu entry point: %lx\n", entry_point);
     // addi sp, sp, -0x30  is target: 0
     cpu.regs[2] = cpu.regs[2] + -48;
     // sd ra, 0x28(sp)  is target: 0
@@ -179,8 +178,6 @@ int main(int argc, char** argv) {
     if (argc < 2) { printf("Usage: %s <original_elf>\n", argv[0]); return 1; }
     init_memory(argv[1]);
     cpu.regs[2] = 0x7FFFFFF0;
-    printf("ret val before: %ld\n", cpu.a0);
     run_cpu(starting_address);
-    printf("ret val after: %ld\n", cpu.a0);
     return cpu.a0;
 }

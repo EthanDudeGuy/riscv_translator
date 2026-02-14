@@ -99,9 +99,7 @@ void print_main() {
 	//initialize the stack pointer
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
 	
-	printf("    printf(\"ret val before: %%ld\\n\", cpu.a0);\n");
         printf("    run_cpu(starting_address);\n");
-	printf("    printf(\"ret val after: %%ld\\n\", cpu.a0);\n");
         printf("    return cpu.a0;\n");
         printf("}\n");
 }
@@ -361,7 +359,6 @@ void translate_to_c(csh handle, cs_insn *insn, const std::set<uint64_t>& targets
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, std::set<uint64_t> targets) {
 	//print the header of the instruction
 	printf("void run_cpu(uint64_t entry_point) {\n");
-	printf("    printf(\"run cpu entry point: %%lx\\n\", entry_point);\n");
 	while (code_size > 0) {
 		bool success = cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn);
 
