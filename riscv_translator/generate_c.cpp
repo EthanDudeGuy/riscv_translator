@@ -21,7 +21,21 @@ void print_header() {
         printf("#include <elf.h>\n\n");
 
         printf("// Global RV64 State\n");
-        printf("int64_t x[32] = {0};\n");
+	
+	//register file is a union so we can access registers
+	//with their name or their offset in the registerfile array
+	printf("typedef union {\n");
+	printf("    struct {\n");
+	printf("        int64_t zero, ra, sp, gp, tp, t0, t1, t2;\n");
+	printf("	int64_t s0, s1, a0, a1, a2, a3, a4, a5;\n");
+	printf("	int64_t a6, a7, s2, s3, s4, s5, s6, s7;\n");
+	printf("	int64_t s8, s9, s10, s11, t3, t4, t5, t6;\n");
+	printf("    };\n");
+	printf("    int64_t regs[32];\n\n");
+	printf("} RegisterFile;\n\n");
+	//initialize regfile
+	printf("RegisterFile cpu = {0};\n");
+	//create variables for the memory pointer and the program entry point
         printf("uint8_t* memory = NULL;\n");
 	printf("uint64_t starting_address = 0;\n\n");
 }
@@ -81,57 +95,16 @@ void print_main() {
         printf("\nint main(int argc, char** argv) {\n");
         printf("    if (argc < 2) { printf(\"Usage: %%s <original_elf>\\n\", argv[0]); return 1; }\n");
         printf("    init_memory(argv[1]);\n");
-        printf("    // The entry point will be passed to your run_cpu function\n");
-        printf("    // We'll calculate this during translation\n");
+
+	//initialize the stack pointer
+	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
+	
+	printf("    printf(\"ret val before: %%ld\\n\", cpu.a0);\n");
         printf("    run_cpu(starting_address);\n");
-        printf("    return 0;\n");
+	printf("    printf(\"ret val after: %%ld\\n\", cpu.a0);\n");
+        printf("    return cpu.a0;\n");
         printf("}\n");
 }
-
-
-void translate_to_c(csh handle, cs_insn *insn, const std::set<uint64_t>& targets) {
-    // Check the count
-    int is_target = targets.count(insn->address);
-    
-    // If it's a target, print the label
-    // NOTE: Need to add labels for the instruction immediately after a call or jalr 
-    if (is_target) {
-        printf("L_0x%lx:\n", insn->address);
-    }
-
-    printf("    // %s %s  is target: %d\n", insn->mnemonic, insn->op_str, is_target);
-}
-
-void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, std::set<uint64_t> targets) {
-	//print the header of the instruction
-	printf("void run_cpu(uint64_t entry_point) {\n");
-	printf("    printf(\"%%lx\\n\", entry_point);\n");
-	while (code_size > 0) {
-		bool success = cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn);
-
-		if (success) {
-			//print the functionally equivalent C for a given instruction
-			translate_to_c(handle, insn, targets);
-		} else {
-			if (code_size >= 4) {
-				uint64_t raw_instr = *(uint64_t*)code_ptr;
-
-				printf("    // Custom Instruction: 0x%08lx\n", raw_instr);
-
-				//advance pointers manually
-				code_ptr += 4;
-				code_size -= 4;
-				address += 4;
-
-			} else {
-				break; //trailing whatever
-			}
-		}
-	
-	}
-	printf("}\n");
-}
-
 
 bool is_branch(cs_insn *insn) {
 	cs_detail *detail = insn->detail;
@@ -164,6 +137,255 @@ uint64_t get_branch_target(cs_insn *insn) {
         }
     }
     return 0; 
+}
+
+
+int reg_to_index(unsigned int reg) {
+	if (reg >= RISCV_REG_X0 && reg <= RISCV_REG_X31) {
+		return reg - RISCV_REG_X0;
+	}
+	std::cerr << "register index translation failed\n" << std::endl;
+	return -1;
+}
+
+
+void translate_to_c(csh handle, cs_insn *insn, const std::set<uint64_t>& targets) {
+   	// Check the count
+	int is_target = targets.count(insn->address);
+    
+	// If it's a target, print the label
+	// NOTE: Need to add labels for the instruction immediately after a call or jalr 
+	if (is_target) {
+		printf("L_0x%lx:\n", insn->address);
+	}
+
+	printf("    // %s %s  is target: %d\n", insn->mnemonic, insn->op_str, is_target);
+
+	cs_riscv *riscv = &(insn->detail->riscv);
+
+	switch (insn->id) {
+		//detect instruction type and translate
+		
+		//add immediate instructions
+		case RISCV_INS_ADDI: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int64_t imm = riscv->operands[2].imm;
+			//0 reg should not be added into
+			if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] + %ld;\n", rd, rs1, imm);
+			break;
+		}
+		case RISCV_INS_ADDIW: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int64_t imm = riscv->operands[2].imm;
+			//0 reg should not be added into
+			//cast to 32 then back to 64 to make the overflow behave the same
+			if (rd != 0) printf("    cpu.regs[%d] = (int64_t)(int32_t)(cpu.regs[%d] + %ld);\n", rd, rs1, imm);
+			break;
+		}
+		
+		//add register instructions
+		case RISCV_INS_ADD: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rs2 = reg_to_index(riscv->operands[2].reg);
+			//0 reg should not be added into
+			if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] + cpu.regs[%d];\n", rd, rs1, rs2);
+			break;
+		}
+		case RISCV_INS_ADDW: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rs2 = reg_to_index(riscv->operands[2].reg);
+			//0 reg should not be added into
+			//cast to 32 and then back so overflow works the same
+			if (rd != 0) printf("    cpu.regs[%d] = (int64_t)(int32_t)(cpu.regs[%d] + cpu.regs[%d]);\n", rd, rs1, rs2);
+			break;
+		}
+
+		//multiply instructions
+		case RISCV_INS_MUL: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rs2 = reg_to_index(riscv->operands[2].reg);
+			//0 reg should not be added into
+			if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] * cpu.regs[%d];\n", rd, rs1, rs2);
+			break;
+		}
+		case RISCV_INS_MULW: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rs2 = reg_to_index(riscv->operands[2].reg);
+			//0 reg should not be added into
+			if (rd != 0) printf("    cpu.regs[%d] = (uint64_t)(uint32_t)(cpu.regs[%d] * cpu.regs[%d]);\n", rd, rs1, rs2);
+			break;
+		}
+
+
+		//branching instructions
+		//Branch equal
+		case RISCV_INS_BEQ: {
+			int rs1 = reg_to_index(riscv->operands[0].reg);
+			int rs2 = 0;
+			uint64_t target = get_branch_target(insn);
+			
+			//beqz will have the same enum but only two operands for the register and target imm
+			if (riscv->op_count == 3) {
+				rs2 = reg_to_index(riscv->operands[1].reg);
+			} else if (riscv->op_count == 2) {
+				rs2 = 0;
+			} else {
+				std::cerr << "invalid opcount for branch equal instr" << std::endl;
+			}
+
+			printf("    if (cpu.regs[%d] == cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
+			break;
+		}
+
+	
+		//branch not equal
+		case RISCV_INS_BNE: {
+			int rs1 = reg_to_index(riscv->operands[0].reg);
+			int rs2 = 0;
+			uint64_t target = get_branch_target(insn);
+			
+			//bnez will have the same enum but only two operands for the register and target imm
+			if (riscv->op_count == 3) {
+				rs2 = reg_to_index(riscv->operands[1].reg);
+			} else if (riscv->op_count == 2) {
+				rs2 = 0;
+			} else {
+				std::cerr << "invalid opcount for branch equal instr" << std::endl;
+			}
+
+			printf("    if (cpu.regs[%d] != cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
+			break;
+		}
+
+		//branch less than unsigned
+		case RISCV_INS_BLTU: {
+			int rs1 = reg_to_index(riscv->operands[0].reg);
+			int rs2 = reg_to_index(riscv->operands[1].reg);
+			uint64_t target = get_branch_target(insn);
+			
+			//need to cast register values to unsigned
+			printf("    if ((uint64_t)cpu.regs[%d] < (uint64_t)cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
+			break;	
+		}
+
+		//branch less than signed 
+		case RISCV_INS_BLT: {
+			int rs1 = reg_to_index(riscv->operands[0].reg);
+			int rs2 = reg_to_index(riscv->operands[1].reg);
+			uint64_t target = get_branch_target(insn);
+			
+			//no cast
+			printf("    if (cpu.regs[%d] < cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
+			break;
+		}
+
+		//unconditional jumps
+		case RISCV_INS_JAL: {
+			//TODO: add linking mechanic for jump and link when we need it (not yet for factorial)
+			if (riscv->op_count == 1) {
+				//just a regular jump (no link)
+				uint64_t target = get_branch_target(insn);
+				printf("    goto L_0x%lx;\n", target);
+			}
+			break;
+		}
+
+		//store double instruction
+		case RISCV_INS_SD: {
+			int rs2 = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+			printf("    *(int64_t*)(memory + cpu.regs[%d] + %ld) = cpu.regs[%d];\n", base_reg, offset, rs2);
+			break;
+		}
+
+		//store word instruction
+		case RISCV_INS_SW: {
+			int rs2 = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+			printf("    *(int32_t*)(memory + cpu.regs[%d] + %ld) = (int64_t)(int32_t)(cpu.regs[%d]);\n", base_reg, offset, rs2);
+			break;
+		}
+
+
+		//load double instruction
+		case RISCV_INS_LD: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+			//dont ever load to reg 0
+			if (rd != 0) printf("    cpu.regs[%d] = *(int64_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
+			break;
+		}
+
+		//load word instruction
+		case RISCV_INS_LW: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+			//dont ever load to reg 0
+			if (rd != 0) printf("    cpu.regs[%d] = (int64_t)*(int32_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
+			break;
+		}
+
+		//load word instruction unsigned
+		case RISCV_INS_LWU: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+			//dont ever load to reg 0
+			if (rd != 0) printf("    cpu.regs[%d] = (int64_t)*(uint32_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
+			break;
+		}
+
+		case RISCV_INS_JALR: {
+			//TODO: only a basic ret from main right now, need to update to handle actual jalr not ret from main
+			printf("    return;\n");
+			break;
+		}	     
+
+		default:
+			printf("//-------UNDEFINED INSTRUCTION IN SWITCH, ADD A CASE FOR ABOVE----------\n");
+			break;
+
+	}
+}
+
+void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, std::set<uint64_t> targets) {
+	//print the header of the instruction
+	printf("void run_cpu(uint64_t entry_point) {\n");
+	printf("    printf(\"run cpu entry point: %%lx\\n\", entry_point);\n");
+	while (code_size > 0) {
+		bool success = cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn);
+
+		if (success) {
+			//print the functionally equivalent C for a given instruction
+			translate_to_c(handle, insn, targets);
+		} else {
+			if (code_size >= 4) {
+				uint64_t raw_instr = *(uint64_t*)code_ptr;
+
+				printf("    // Custom Instruction: 0x%08lx\n", raw_instr);
+
+				//advance pointers manually
+				code_ptr += 4;
+				code_size -= 4;
+				address += 4;
+
+			} else {
+				break; //trailing whatever
+			}
+		}
+	
+	}
+	printf("}\n");
 }
 
 

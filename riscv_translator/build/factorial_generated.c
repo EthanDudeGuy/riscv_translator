@@ -7,7 +7,18 @@
 #include <elf.h>
 
 // Global RV64 State
-int64_t x[32] = {0};
+typedef union {
+    struct {
+        int64_t zero, ra, sp, gp, tp, t0, t1, t2;
+	int64_t s0, s1, a0, a1, a2, a3, a4, a5;
+	int64_t a6, a7, s2, s3, s4, s5, s6, s7;
+	int64_t s8, s9, s10, s11, t3, t4, t5, t6;
+    };
+    int64_t regs[32];
+
+} RegisterFile;
+
+RegisterFile cpu = {0};
 uint8_t* memory = NULL;
 uint64_t starting_address = 0;
 
@@ -59,69 +70,117 @@ void init_memory(const char* elf_path) {
 }
 
 void run_cpu(uint64_t entry_point) {
-    printf("%lx\n", entry_point);
+    printf("run cpu entry point: %lx\n", entry_point);
     // addi sp, sp, -0x30  is target: 0
+    cpu.regs[2] = cpu.regs[2] + -48;
     // sd ra, 0x28(sp)  is target: 0
+    *(int64_t*)(memory + cpu.regs[2] + 40) = cpu.regs[1];
     // sd s0, 0x20(sp)  is target: 0
+    *(int64_t*)(memory + cpu.regs[2] + 32) = cpu.regs[8];
     // addi s0, sp, 0x30  is target: 0
+    cpu.regs[8] = cpu.regs[2] + 48;
     // mv a2, zero  is target: 0
+    cpu.regs[12] = cpu.regs[0] + 0;
     // sw a2, -0x14(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -20) = (int64_t)(int32_t)(cpu.regs[12]);
     // sw a0, -0x18(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -24) = (int64_t)(int32_t)(cpu.regs[10]);
     // sd a1, -0x20(s0)  is target: 0
+    *(int64_t*)(memory + cpu.regs[8] + -32) = cpu.regs[11];
     // addi a0, zero, 1  is target: 0
+    cpu.regs[10] = cpu.regs[0] + 1;
     // sd a0, -0x28(s0)  is target: 0
+    *(int64_t*)(memory + cpu.regs[8] + -40) = cpu.regs[10];
     // addi a0, zero, 5  is target: 0
+    cpu.regs[10] = cpu.regs[0] + 5;
     // sw a0, -0x2c(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -44) = (int64_t)(int32_t)(cpu.regs[10]);
     // lw a0, -0x2c(s0)  is target: 0
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -44);
     // beqz a0, 0x18  is target: 0
+    if (cpu.regs[10] == cpu.regs[0]) goto L_0x111a4;
     // j 4  is target: 0
+    goto L_0x11194;
 L_0x11194:
     // lw a0, -0x2c(s0)  is target: 1
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -44);
     // addi a1, zero, 1  is target: 0
+    cpu.regs[11] = cpu.regs[0] + 1;
     // bne a0, a1, 0x14  is target: 0
+    if (cpu.regs[10] != cpu.regs[11]) goto L_0x111b0;
     // j 4  is target: 0
+    goto L_0x111a4;
 L_0x111a4:
     // addi a0, zero, 1  is target: 1
+    cpu.regs[10] = cpu.regs[0] + 1;
     // sw a0, -0x14(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -20) = (int64_t)(int32_t)(cpu.regs[10]);
     // j 0x50  is target: 0
+    goto L_0x111fc;
 L_0x111b0:
     // addi a0, zero, 2  is target: 1
+    cpu.regs[10] = cpu.regs[0] + 2;
     // sw a0, -0x30(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -48) = (int64_t)(int32_t)(cpu.regs[10]);
     // j 4  is target: 0
+    goto L_0x111bc;
 L_0x111bc:
     // lw a1, -0x30(s0)  is target: 1
+    cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -48);
     // lw a0, -0x2c(s0)  is target: 0
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -44);
     // bltu a0, a1, 0x2c  is target: 0
+    if ((uint64_t)cpu.regs[10] < (uint64_t)cpu.regs[11]) goto L_0x111f0;
     // j 4  is target: 0
+    goto L_0x111cc;
 L_0x111cc:
     // lwu a1, -0x30(s0)  is target: 1
+    cpu.regs[11] = (int64_t)*(uint32_t*)(memory + cpu.regs[8] + -48);
     // ld a0, -0x28(s0)  is target: 0
+    cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -40);
     // mul a0, a0, a1  is target: 0
+    cpu.regs[10] = cpu.regs[10] * cpu.regs[11];
     // sd a0, -0x28(s0)  is target: 0
+    *(int64_t*)(memory + cpu.regs[8] + -40) = cpu.regs[10];
     // j 4  is target: 0
+    goto L_0x111e0;
 L_0x111e0:
     // lw a0, -0x30(s0)  is target: 1
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -48);
     // addiw a0, a0, 1  is target: 0
+    cpu.regs[10] = (int64_t)(int32_t)(cpu.regs[10] + 1);
     // sw a0, -0x30(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -48) = (int64_t)(int32_t)(cpu.regs[10]);
     // j -0x30  is target: 0
+    goto L_0x111bc;
 L_0x111f0:
     // ld a0, -0x28(s0)  is target: 1
+    cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -40);
     // sw a0, -0x14(s0)  is target: 0
+    *(int32_t*)(memory + cpu.regs[8] + -20) = (int64_t)(int32_t)(cpu.regs[10]);
     // j 4  is target: 0
+    goto L_0x111fc;
 L_0x111fc:
     // lw a0, -0x14(s0)  is target: 1
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -20);
     // addi sp, s0, -0x30  is target: 0
+    cpu.regs[2] = cpu.regs[8] + -48;
     // ld ra, 0x28(sp)  is target: 0
+    cpu.regs[1] = *(int64_t*)(memory + cpu.regs[2] + 40);
     // ld s0, 0x20(sp)  is target: 0
+    cpu.regs[8] = *(int64_t*)(memory + cpu.regs[2] + 32);
     // addi sp, sp, 0x30  is target: 0
+    cpu.regs[2] = cpu.regs[2] + 48;
     // ret   is target: 0
+    return;
 }
 
 int main(int argc, char** argv) {
     if (argc < 2) { printf("Usage: %s <original_elf>\n", argv[0]); return 1; }
     init_memory(argv[1]);
-    // The entry point will be passed to your run_cpu function
-    // We'll calculate this during translation
+    cpu.regs[2] = 0x7FFFFFF0;
+    printf("ret val before: %ld\n", cpu.a0);
     run_cpu(starting_address);
-    return 0;
+    printf("ret val after: %ld\n", cpu.a0);
+    return cpu.a0;
 }
