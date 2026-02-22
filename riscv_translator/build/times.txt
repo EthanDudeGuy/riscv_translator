@@ -1,0 +1,200 @@
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+Usage: ./x86equivalentof_test_factorial <original_elf>
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158
+[Loader] Entry point found: 0x00011158
+[Loader] Loaded segment at 0x00010000
+[Loader] Loaded segment at 0x00011158

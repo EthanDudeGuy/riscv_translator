@@ -33,8 +33,7 @@ void print_header() {
 	printf("    };\n");
 	printf("    int64_t regs[32];\n\n");
 	printf("} RegisterFile;\n\n");
-	//initialize regfile
-	printf("RegisterFile cpu = {0};\n");
+
 	//create variables for the memory pointer and the program entry point
         printf("uint8_t* memory = NULL;\n");
 	printf("uint64_t starting_address = 0;\n\n");
@@ -93,14 +92,14 @@ void print_init_memory() {
 //prints main
 void print_main() {
         printf("\nint main(int argc, char** argv) {\n");
-        printf("    if (argc < 2) { printf(\"Usage: %%s <original_elf>\\n\", argv[0]); return 1; }\n");
-        printf("    init_memory(argv[1]);\n");
+        printf("    if (argc < 2) { printf(\"Usage: %%s <extracted text section binary> <original_elf>\\n\", argv[0]); return 1; }\n");
+        
+	printf("    int64_t retval = 0;\n");
+	printf("    init_memory(argv[1]);\n");
 
-	//initialize the stack pointer
-	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
-	
-        printf("    run_cpu(starting_address);\n");
-        printf("    return cpu.a0;\n");
+
+        printf("    retval = run_cpu(starting_address);\n");
+        printf("    return retval;\n");
         printf("}\n");
 }
 
@@ -308,7 +307,8 @@ void translate_to_c(csh handle, cs_insn *insn, const std::set<uint64_t>& targets
 			int rs2 = reg_to_index(riscv->operands[0].reg);
 			int base_reg = reg_to_index(riscv->operands[1].mem.base);
 			int64_t offset = riscv->operands[1].mem.disp;
-			printf("    *(int32_t*)(memory + cpu.regs[%d] + %ld) = (int64_t)(int32_t)(cpu.regs[%d]);\n", base_reg, offset, rs2);
+			//TODO: is this right for storing a 32 bit value? will this be in the right place in memory???
+			printf("    *(int32_t*)(memory + cpu.regs[%d] + %ld) = (int32_t)(cpu.regs[%d]);\n", base_reg, offset, rs2);
 			break;
 		}
 
@@ -343,9 +343,20 @@ void translate_to_c(csh handle, cs_insn *insn, const std::set<uint64_t>& targets
 			break;
 		}
 
+
+		case RISCV_INS_LUI: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int64_t imm = riscv->operands[1].imm;
+			//TODO: shift left 12 to place value into upper part of 32 bit space???? is this right??
+			if (rd != 0) printf("    cpu.regs[%d] = (int64_t)(int32_t)(0x%lx << 12);\n", rd, imm);
+			break;
+		}
+
+
 		case RISCV_INS_JALR: {
 			//TODO: only a basic ret from main right now, need to update to handle actual jalr not ret from main
-			printf("    return;\n");
+			//printf("    return;\n");
+			//ignoring this for now
 			break;
 		}	     
 
@@ -358,7 +369,11 @@ void translate_to_c(csh handle, cs_insn *insn, const std::set<uint64_t>& targets
 
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, std::set<uint64_t> targets) {
 	//print the header of the instruction
-	printf("void run_cpu(uint64_t entry_point) {\n");
+	printf("int64_t run_cpu(uint64_t entry_point) {\n");
+	//initialize regfile
+	printf("    RegisterFile cpu = {0};\n");
+	//initialize the stack pointer
+	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
 	while (code_size > 0) {
 		bool success = cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn);
 
@@ -370,6 +385,8 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 				uint64_t raw_instr = *(uint64_t*)code_ptr;
 
 				printf("    // Custom Instruction: 0x%08lx\n", raw_instr);
+				//need to add custom logic for the custom instructions or so we ignore them here?
+
 
 				//advance pointers manually
 				code_ptr += 4;
@@ -382,6 +399,7 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 		}
 	
 	}
+	printf("    return cpu.a0;\n");
 	printf("}\n");
 }
 
@@ -408,6 +426,7 @@ std::set<uint64_t> collect_branch_targets(csh handle, const uint8_t *code_ptr, s
 			}
 
 		//failed, likely custom instruction, increase pointers
+		//custom instructions will not result in branches
 		} else {
 			code_ptr += 4;
 			code_size -= 4;
@@ -450,7 +469,6 @@ int main(int argc, char** argv) {
         }
         cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
         cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_DEFAULT);
-
 
 	//LOOKING AT THE WHOLE ELF
 	int fd = open(argv[2], O_RDONLY);
