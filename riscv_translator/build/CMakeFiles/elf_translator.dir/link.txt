@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/elf_translator.dir/generate_c_with_function_support.cpp.o -o elf_translator  /home/enemery/riscv_cemu/capstone/install_dir/lib/libcapstone.a 

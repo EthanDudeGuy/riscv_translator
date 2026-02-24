@@ -64,6 +64,7 @@ CMAKE_BINARY_DIR = /home/enemery/riscv_cemu/riscv_translator/build
 
 # The main recursive "all" target.
 all: CMakeFiles/translator.dir/all
+all: CMakeFiles/elf_translator.dir/all
 .PHONY : all
 
 # The main recursive "preinstall" target.
@@ -72,6 +73,7 @@ preinstall:
 
 # The main recursive "clean" target.
 clean: CMakeFiles/translator.dir/clean
+clean: CMakeFiles/elf_translator.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -81,7 +83,7 @@ clean: CMakeFiles/translator.dir/clean
 CMakeFiles/translator.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles --progress-num=1,2 "Built target translator"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles --progress-num=3,4 "Built target translator"
 .PHONY : CMakeFiles/translator.dir/all
 
 # Build rule for subdir invocation for target.
@@ -99,6 +101,32 @@ translator: CMakeFiles/translator.dir/rule
 CMakeFiles/translator.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/clean
 .PHONY : CMakeFiles/translator.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/elf_translator.dir
+
+# All Build rule for target.
+CMakeFiles/elf_translator.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles --progress-num=1,2 "Built target elf_translator"
+.PHONY : CMakeFiles/elf_translator.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/elf_translator.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/elf_translator.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/enemery/riscv_cemu/riscv_translator/build/CMakeFiles 0
+.PHONY : CMakeFiles/elf_translator.dir/rule
+
+# Convenience name for target.
+elf_translator: CMakeFiles/elf_translator.dir/rule
+.PHONY : elf_translator
+
+# clean rule for target.
+CMakeFiles/elf_translator.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/clean
+.PHONY : CMakeFiles/elf_translator.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

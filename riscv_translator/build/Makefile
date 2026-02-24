@@ -129,6 +129,19 @@ translator/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/build
 .PHONY : translator/fast
 
+#=============================================================================
+# Target rules for targets named elf_translator
+
+# Build rule for target.
+elf_translator: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 elf_translator
+.PHONY : elf_translator
+
+# fast build rule for target.
+elf_translator/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/build
+.PHONY : elf_translator/fast
+
 generate_c.o: generate_c.cpp.o
 .PHONY : generate_c.o
 
@@ -153,6 +166,30 @@ generate_c.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/translator.dir/build.make CMakeFiles/translator.dir/generate_c.cpp.s
 .PHONY : generate_c.cpp.s
 
+generate_c_with_function_support.o: generate_c_with_function_support.cpp.o
+.PHONY : generate_c_with_function_support.o
+
+# target to build an object file
+generate_c_with_function_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/generate_c_with_function_support.cpp.o
+.PHONY : generate_c_with_function_support.cpp.o
+
+generate_c_with_function_support.i: generate_c_with_function_support.cpp.i
+.PHONY : generate_c_with_function_support.i
+
+# target to preprocess a source file
+generate_c_with_function_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/generate_c_with_function_support.cpp.i
+.PHONY : generate_c_with_function_support.cpp.i
+
+generate_c_with_function_support.s: generate_c_with_function_support.cpp.s
+.PHONY : generate_c_with_function_support.s
+
+# target to generate assembly for a file
+generate_c_with_function_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/elf_translator.dir/build.make CMakeFiles/elf_translator.dir/generate_c_with_function_support.cpp.s
+.PHONY : generate_c_with_function_support.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -161,10 +198,14 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... elf_translator"
 	@echo "... translator"
 	@echo "... generate_c.o"
 	@echo "... generate_c.i"
 	@echo "... generate_c.s"
+	@echo "... generate_c_with_function_support.o"
+	@echo "... generate_c_with_function_support.i"
+	@echo "... generate_c_with_function_support.s"
 .PHONY : help
 
 

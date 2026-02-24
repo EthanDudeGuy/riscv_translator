@@ -20,3 +20,17 @@ else()
     target_include_directories(translator PRIVATE ${capstone_INCLUDE_DIR})
     target_link_libraries(translator PRIVATE "${capstone_LIB_DIR}/libcapstone.a")
 endif()
+
+add_executable(elf_translator generate_c_with_function_support.cpp)
+
+if(TARGET capstone::capstone)
+    target_link_libraries(elf_translator PRIVATE capstone::capstone)
+else()
+    # Manual link using the include and library variables from capstone-config.cmake
+    target_include_directories(elf_translator PRIVATE ${capstone_INCLUDE_DIR})
+    target_link_libraries(elf_translator PRIVATE "${capstone_LIB_DIR}/libcapstone.a")
+endif()
+
+
+
+
