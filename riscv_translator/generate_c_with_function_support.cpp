@@ -41,23 +41,31 @@ void print_header() {
 
 
 
+void translate_to_c(csh handle, cs_insn *insn) {
+	printf("L_0x%ld:\n", insn->address);
 
-void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn) {
+        printf("    // %s %s\n", insn->mnemonic, insn->op_str);
+
+        cs_riscv *riscv = &(insn->detail->riscv);
+}
+
+
+void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr) {
 	//print the header of the instruction
-	printf("int64_t run_cpu(uint64_t entry_point) {\n");
+	printf("int64_t run_cpu() {\n");
 	//initialize regfile
 	printf("    RegisterFile cpu = {0};\n");
 	//initialize the stack pointer
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
 
 	//need to add a goto to main here now
-
+	printf("    goto L_0x%ld;\n", main_addr);
 
 	while (code_size > 0) {
 		bool success = cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn);
 
 		if (success) {
-			printf("    // %s %s  \n", insn->mnemonic, insn->op_str);
+			translate_to_c(handle, insn);
 		} else {
 			if (code_size >= 4) {
 				uint64_t raw_instr = *(uint64_t*)code_ptr;
@@ -128,9 +136,6 @@ int main(int argc, char** argv) {
 	uint64_t text_section_addr = 0;
 	size_t text_size = 0;
 
-	//set for the entry point of all functions
-	//will be used for adding labels for these
-	std::set<uint64_t> function_entry_points;
 
 	//iterate through the section headers
 	for (int i = 0; i < ehdr->e_shnum; i++) {
@@ -142,19 +147,6 @@ int main(int argc, char** argv) {
             		text_section_ptr = elf_buffer.data() + shdrs[i].sh_offset;
             		text_section_addr = shdrs[i].sh_addr;
             		text_size = shdrs[i].sh_size;
-        	}
-        
-        	// Collect function entries from symbol table
-       		if (shdrs[i].sh_type == SHT_SYMTAB) {
-            		Elf64_Sym* syms = (Elf64_Sym*)(elf_buffer.data() + shdrs[i].sh_offset);
-            		int count = shdrs[i].sh_size / sizeof(Elf64_Sym);
-            		for (int j = 0; j < count; j++) {
-				//if the entry in the symbol table is the start of a function add
-				//it to the set of function starts
-                		if (ELF64_ST_TYPE(syms[j].st_info) == STT_FUNC) {
-                    			function_entry_points.insert(syms[j].st_value);
-                		}
-            		}
         	}
 	}
 
@@ -172,9 +164,11 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 
+	//tells capstone to populate the detail struct
+	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_insn *insn = cs_malloc(handle);
-
-	print_run_cpu(handle, text_section_ptr, text_size, text_section_addr, insn);
+	
+	print_run_cpu(handle, text_section_ptr, text_size, text_section_addr, insn, entry_point);
 	
 	return 0;
 }
