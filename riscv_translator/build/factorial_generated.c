@@ -19,7 +19,6 @@ typedef union {
 } RegisterFile;
 
 uint8_t* memory = NULL;
-uint64_t starting_address = 0;
 
 void init_memory(const char* elf_path) {
     // 1. Reserve 4GB virtual address space
@@ -46,9 +45,6 @@ void init_memory(const char* elf_path) {
         fprintf(stderr, "Error: Expected 64-bit ELF\n"); exit(1);
     }
 
-    starting_address = ehdr.e_entry;
-    printf("[Loader] Entry point found: 0x%08lx\n", starting_address);
-
     // 4. Load Program Headers
     Elf64_Phdr* phdrs = malloc(sizeof(Elf64_Phdr) * ehdr.e_phnum);
     lseek(fd, ehdr.e_phoff, SEEK_SET);
@@ -68,119 +64,184 @@ void init_memory(const char* elf_path) {
     close(fd);
 }
 
-int64_t run_cpu(uint64_t entry_point) {
+int64_t run_cpu() {
     RegisterFile cpu = {0};
     cpu.regs[2] = 0x7FFFFFF0;
-    // addi sp, sp, -0x30  is target: 0
+    cpu.regs[1] = 0xDEADBEEF;
+    //jump table (O(1) access, longer build time)
+    static void* label_map[] = {
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x111c8,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x111dc,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x111e8,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x111f4,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x11208,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x1121c,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x1122c,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_0x11238,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+        &&L_INVALID_TARGET,
+    };
+    uint64_t base_address = 0x11190ULL;
+
+    goto L_0x11190;
+L_0x11190:
+    // addi sp, sp, -0x30
     cpu.regs[2] = cpu.regs[2] + -48;
-    // sd ra, 0x28(sp)  is target: 0
+    // sd ra, 0x28(sp)
     *(int64_t*)(memory + cpu.regs[2] + 40) = cpu.regs[1];
-    // sd s0, 0x20(sp)  is target: 0
+    // sd s0, 0x20(sp)
     *(int64_t*)(memory + cpu.regs[2] + 32) = cpu.regs[8];
-    // addi s0, sp, 0x30  is target: 0
+    // addi s0, sp, 0x30
     cpu.regs[8] = cpu.regs[2] + 48;
-    // mv a2, zero  is target: 0
+    // mv a2, zero
     cpu.regs[12] = cpu.regs[0] + 0;
-    // sw a2, -0x14(s0)  is target: 0
+    // sw a2, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[12]);
-    // sw a0, -0x18(s0)  is target: 0
+    // sw a0, -0x18(s0)
     *(int32_t*)(memory + cpu.regs[8] + -24) = (int32_t)(cpu.regs[10]);
-    // sd a1, -0x20(s0)  is target: 0
+    // sd a1, -0x20(s0)
     *(int64_t*)(memory + cpu.regs[8] + -32) = cpu.regs[11];
-    // addi a0, zero, 1  is target: 0
+    // addi a0, zero, 1
     cpu.regs[10] = cpu.regs[0] + 1;
-    // sd a0, -0x28(s0)  is target: 0
+    // sd a0, -0x28(s0)
     *(int64_t*)(memory + cpu.regs[8] + -40) = cpu.regs[10];
-    // lui a0, 0x12  is target: 0
+    // lui a0, 0x12
     cpu.regs[10] = (int64_t)(int32_t)(0x12 << 12);
-    // lw a0, 0x250(a0)  is target: 0
+    // lw a0, 0x250(a0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[10] + 592);
-    // beqz a0, 0x1c  is target: 0
+    // beqz a0, 0x1c
     if (cpu.regs[10] == cpu.regs[0]) goto L_0x111dc;
-    // j 4  is target: 0
+    // j 4
     goto L_0x111c8;
 L_0x111c8:
-    // lui a0, 0x12  is target: 1
+    // lui a0, 0x12
     cpu.regs[10] = (int64_t)(int32_t)(0x12 << 12);
-    // lw a0, 0x250(a0)  is target: 0
+    // lw a0, 0x250(a0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[10] + 592);
-    // addi a1, zero, 1  is target: 0
+    // addi a1, zero, 1
     cpu.regs[11] = cpu.regs[0] + 1;
-    // bne a0, a1, 0x14  is target: 0
+    // bne a0, a1, 0x14
     if (cpu.regs[10] != cpu.regs[11]) goto L_0x111e8;
-    // j 4  is target: 0
+    // j 4
     goto L_0x111dc;
 L_0x111dc:
-    // addi a0, zero, 1  is target: 1
+    // addi a0, zero, 1
     cpu.regs[10] = cpu.regs[0] + 1;
-    // sw a0, -0x14(s0)  is target: 0
+    // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
-    // j 0x54  is target: 0
+    // j 0x54
     goto L_0x11238;
 L_0x111e8:
-    // addi a0, zero, 2  is target: 1
+    // addi a0, zero, 2
     cpu.regs[10] = cpu.regs[0] + 2;
-    // sw a0, -0x2c(s0)  is target: 0
+    // sw a0, -0x2c(s0)
     *(int32_t*)(memory + cpu.regs[8] + -44) = (int32_t)(cpu.regs[10]);
-    // j 4  is target: 0
+    // j 4
     goto L_0x111f4;
 L_0x111f4:
-    // lw a1, -0x2c(s0)  is target: 1
+    // lw a1, -0x2c(s0)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -44);
-    // lui a0, 0x12  is target: 0
+    // lui a0, 0x12
     cpu.regs[10] = (int64_t)(int32_t)(0x12 << 12);
-    // lw a0, 0x250(a0)  is target: 0
+    // lw a0, 0x250(a0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[10] + 592);
-    // bltu a0, a1, 0x2c  is target: 0
+    // bltu a0, a1, 0x2c
     if ((uint64_t)cpu.regs[10] < (uint64_t)cpu.regs[11]) goto L_0x1122c;
-    // j 4  is target: 0
+    // j 4
     goto L_0x11208;
 L_0x11208:
-    // lwu a1, -0x2c(s0)  is target: 1
+    // lwu a1, -0x2c(s0)
     cpu.regs[11] = (int64_t)*(uint32_t*)(memory + cpu.regs[8] + -44);
-    // ld a0, -0x28(s0)  is target: 0
+    // ld a0, -0x28(s0)
     cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -40);
-    // mul a0, a0, a1  is target: 0
+    // mul a0, a0, a1
     cpu.regs[10] = cpu.regs[10] * cpu.regs[11];
-    // sd a0, -0x28(s0)  is target: 0
+    // sd a0, -0x28(s0)
     *(int64_t*)(memory + cpu.regs[8] + -40) = cpu.regs[10];
-    // j 4  is target: 0
+    // j 4
     goto L_0x1121c;
 L_0x1121c:
-    // lw a0, -0x2c(s0)  is target: 1
+    // lw a0, -0x2c(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -44);
-    // addiw a0, a0, 1  is target: 0
+    // addiw a0, a0, 1
     cpu.regs[10] = (int64_t)(int32_t)(cpu.regs[10] + 1);
-    // sw a0, -0x2c(s0)  is target: 0
+    // sw a0, -0x2c(s0)
     *(int32_t*)(memory + cpu.regs[8] + -44) = (int32_t)(cpu.regs[10]);
-    // j -0x34  is target: 0
+    // j -0x34
     goto L_0x111f4;
 L_0x1122c:
-    // ld a0, -0x28(s0)  is target: 1
+    // ld a0, -0x28(s0)
     cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -40);
-    // sw a0, -0x14(s0)  is target: 0
+    // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
-    // j 4  is target: 0
+    // j 4
     goto L_0x11238;
 L_0x11238:
-    // lw a0, -0x14(s0)  is target: 1
+    // lw a0, -0x14(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -20);
-    // addi sp, s0, -0x30  is target: 0
+    // addi sp, s0, -0x30
     cpu.regs[2] = cpu.regs[8] + -48;
-    // ld ra, 0x28(sp)  is target: 0
+    // ld ra, 0x28(sp)
     cpu.regs[1] = *(int64_t*)(memory + cpu.regs[2] + 40);
-    // ld s0, 0x20(sp)  is target: 0
+    // ld s0, 0x20(sp)
     cpu.regs[8] = *(int64_t*)(memory + cpu.regs[2] + 32);
-    // addi sp, sp, 0x30  is target: 0
+    // addi sp, sp, 0x30
     cpu.regs[2] = cpu.regs[2] + 48;
-    // ret   is target: 0
-    return cpu.a0;
+    // ret 
+    if (cpu.regs[1] != 0xDEADBEEF) {
+        goto *label_map[(cpu.regs[1] - base_address) / 4];
+    } else {
+        return cpu.a0;
+    }
+
+
+L_INVALID_TARGET:
+    fprintf(stderr, "invalid target hit\n");
+    exit(1);
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) { printf("Usage: %s <extracted text section binary> <original_elf>\n", argv[0]); return 1; }
+    if (argc < 2) { printf("Usage: %s <original_elf>\n", argv[0]); return 1; }
     int64_t retval = 0;
     init_memory(argv[1]);
-    retval = run_cpu(starting_address);
+    retval = run_cpu();
     return retval;
 }
