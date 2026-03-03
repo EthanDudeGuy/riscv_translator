@@ -213,11 +213,8 @@ std::set<uint64_t> collect_branch_targets(csh handle, const uint8_t *code_ptr, s
 
 //-----------------------LOGIC PRINTING-------------//
 
-void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint64_t main_addr) {
-	if (targets.count(insn->address) || insn->address == main_addr) {
-		printf("L_0x%lx:\n", insn->address);
-	}
 
+void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint64_t main_addr) {
         printf("    // %s %s\n", insn->mnemonic, insn->op_str);
         cs_riscv *riscv = &(insn->detail->riscv);
 
@@ -432,6 +429,11 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
+
+
+
+
+
 		case RISCV_INS_AUIPC: {
 			int rd = reg_to_index(riscv->operands[0].reg);
 			int64_t imm = (int64_t)riscv->operands[1].imm << 12;	
@@ -440,35 +442,18 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (rd != 0) {
 				// rd = current_pc + immediate
 				printf("    cpu.regs[%d] = 0x%lxULL + %ldLL;\n", rd, pc, imm);
-		    	}
+			}
 			break;
 		}
+
 
 		case RISCV_INS_JALR: {
 			if (!riscv->operands[0].reg && !riscv->operands[1].reg) {
 				//ret instruction
-				printf("    if (cpu.regs[1] != 0xDEADBEEF) {\n");
-				printf("        goto *label_map[(cpu.regs[1] - base_address) / 4];\n");
-				printf("    } else {\n");
-				printf("        return cpu.a0;\n");
-				printf("    }\n");
+				printf("    goto *(void *)cpu.regs[1];\n");
 			} else {
 				//regular jalr
-				int rd = reg_to_index(riscv->operands[0].reg);
-				int rs1 = reg_to_index(riscv->operands[1].reg);
-				int64_t offset = riscv->operands[2].imm;
-				
-				printf("    {\n");
-				// Calculate the jump target first
-				printf("        uint64_t target = (cpu.regs[%d] + %ld) & ~1ULL;\n", rs1, offset);
-				    
-				if (rd != 0) {
-					printf("        cpu.regs[%d] = 0x%lxULL;\n", rd, insn->address + 4);
-				}
-
-				printf("        uint64_t index = (target - base_address) / 4;\n");
-				printf("        goto *label_map[index];\n");
-				printf("    }\n");
+				printf("//-------NON RET JALR ENCOUNTERED, THIS IS DISSALLOWED-----------\n");
 			}
 			break;
 		}
@@ -481,70 +466,75 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 
 
 }
-
-void print_label_map(uint64_t text_section_addr, size_t text_size, const std::set<uint64_t>& targets) {
-	printf("    //jump table (O(1) access, longer build time)\n");
-	printf("    static void* label_map[] = {\n");
-
-	for (uint64_t i = 0; i < text_size; i += 4) {
-		uint64_t addr = text_section_addr + i;
-		if (targets.count(addr)) {
-			printf("        &&L_0x%lx,\n", addr);
-		} else {
-			// Point invalid targets error label
-			printf("        &&L_INVALID_TARGET,\n");
-		}
-	}
-
-	printf("    };\n");
-	printf("    uint64_t base_address = 0x%lxULL;\n\n", text_section_addr);
-}
-
-
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets) {
-	//print the header of the instruction
 	printf("int64_t run_cpu() {\n");
-	//initialize regfile
 	printf("    RegisterFile cpu = {0};\n");
-	//initialize the stack pointer
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
-	//set main return value so we can detect a return from main and return
-	printf("    cpu.regs[1] = 0xDEADBEEF;\n");
-	//print the label map
-	print_label_map(address, code_size, targets);
-	
-	//need to add a goto to main here now
+	printf("    cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;\n");
 	printf("    goto L_0x%lx;\n", main_addr);
 
 	while (code_size > 0) {
-		bool success = cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn);
+		//get current insn
+		if (!cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn)) {
+			// Handle custom
+			code_ptr += 4;
+			code_size -= 4;
+			address += 4;
+			printf("//-------------CUSTOM INSTRUCTION ENCOUNTERED------------\n");
+			continue;
+        }
 
-		if (success) {
-			translate_to_c(handle, insn, targets, main_addr);
-		} else {
-			if (code_size >= 4) {
-				uint64_t raw_instr = *(uint64_t*)code_ptr;
-
-				printf("    // Custom Instruction: 0x%08lx\n", raw_instr);
-				//need to add custom logic for the custom instructions or so we ignore them here?
-
-
-				//advance pointers manually
-				code_ptr += 4;
-				code_size -= 4;
-				address += 4;
-
-			} else {
-				break; //trailing whatever
-			}
-		}
-	
+        // Print label if it's a branch target
+	if (targets.count(insn->address) || insn->address == main_addr) {
+		printf("L_0x%lx:\n", insn->address);
 	}
 
-	printf("\n\nL_INVALID_TARGET:\n");
-	printf("    fprintf(stderr, \"invalid target hit\\n\");\n");
-	printf("    exit(1);\n");
-	printf("}\n");
+	cs_riscv *riscv = &(insn->detail->riscv);
+
+        //CHECK FOR AUIPC + JALR
+	if (insn->id == RISCV_INS_AUIPC && code_size >= 4) {
+		int rd = reg_to_index(riscv->operands[0].reg);
+		int64_t auipc_imm = riscv->operands[1].imm;
+		uint64_t auipc_pc = insn->address;
+
+		//NEXT instruction peak, get tmp values to inspect
+		cs_insn *next_insn = cs_malloc(handle);
+		const uint8_t *tmp_ptr = code_ptr;
+		size_t tmp_size = code_size;
+		uint64_t tmp_addr = address;
+
+		if (cs_disasm_iter(handle, &tmp_ptr, &tmp_size, &tmp_addr, next_insn)) {
+
+                	cs_riscv *next_riscv = &(next_insn->detail->riscv);
+                
+                	// If it's a JALR using the register we just set	
+			if (next_insn->id == RISCV_INS_JALR && reg_to_index(next_riscv->operands[1].reg) == rd) {
+				uint64_t target = (auipc_pc + auipc_imm + next_riscv->operands[2].imm) & ~1ULL;
+				uint64_t ret_addr = next_insn->address + 4;
+		
+				printf("    // Optimized AUIPC + JALR -> Static Goto\n");
+				printf("    cpu.regs[1] = (int64_t)&&L_0x%lx;\n", ret_addr);
+                    		printf("    goto L_0x%lx;\n", target);
+
+                    		// Consumed the next instruction, so update real pointers
+                    		code_ptr = tmp_ptr;
+                    		code_size = tmp_size;
+                    		address = tmp_addr;
+                    		cs_free(next_insn, 1);
+                    		continue; // Done with this pair
+                	}
+		}
+		
+		cs_free(next_insn, 1);
+        }
+
+        // If we didn't 'continue' from the AUIPC+JALR block
+        translate_to_c(handle, insn, targets, main_addr);
+    }
+
+    printf("\nL_RETFROMMAIN:\n");
+    printf("    return cpu.regs[10];\n");
+    printf("}\n");
 }
 
 

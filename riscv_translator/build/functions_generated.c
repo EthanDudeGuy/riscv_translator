@@ -67,47 +67,7 @@ void init_memory(const char* elf_path) {
 int64_t run_cpu() {
     RegisterFile cpu = {0};
     cpu.regs[2] = 0x7FFFFFF0;
-    cpu.regs[1] = 0xDEADBEEF;
-    //jump table (O(1) access, longer build time)
-    static void* label_map[] = {
-        &&L_0x11190,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x11200,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-    };
-    uint64_t base_address = 0x11190ULL;
-
+    cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;
     goto L_0x111c8;
 L_0x11190:
     // addi sp, sp, -0x20
@@ -137,11 +97,7 @@ L_0x11190:
     // addi sp, sp, 0x20
     cpu.regs[2] = cpu.regs[2] + 32;
     // ret 
-    if (cpu.regs[1] != 0xDEADBEEF) {
-        goto *label_map[(cpu.regs[1] - base_address) / 4];
-    } else {
-        return cpu.a0;
-    }
+    goto *(void *)cpu.regs[1];
 L_0x111c8:
     // addi sp, sp, -0x20
     cpu.regs[2] = cpu.regs[2] + -32;
@@ -167,15 +123,9 @@ L_0x111c8:
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
     // lw a1, -0x1c(s0)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -28);
-    // auipc ra, 0
-    cpu.regs[1] = 0x111f8ULL + 0LL;
-    // jalr ra, ra, -0x68
-    {
-        uint64_t target = (cpu.regs[1] + -104) & ~1ULL;
-        cpu.regs[1] = 0x11200ULL;
-        uint64_t index = (target - base_address) / 4;
-        goto *label_map[index];
-    }
+    // Optimized AUIPC + JALR -> Static Goto
+    cpu.regs[1] = (int64_t)&&L_0x11200;
+    goto L_0x11190;
 L_0x11200:
     // sw a0, -0x20(s0)
     *(int32_t*)(memory + cpu.regs[8] + -32) = (int32_t)(cpu.regs[10]);
@@ -190,16 +140,10 @@ L_0x11200:
     // addi sp, sp, 0x20
     cpu.regs[2] = cpu.regs[2] + 32;
     // ret 
-    if (cpu.regs[1] != 0xDEADBEEF) {
-        goto *label_map[(cpu.regs[1] - base_address) / 4];
-    } else {
-        return cpu.a0;
-    }
+    goto *(void *)cpu.regs[1];
 
-
-L_INVALID_TARGET:
-    fprintf(stderr, "invalid target hit\n");
-    exit(1);
+L_RETFROMMAIN:
+    return cpu.regs[10];
 }
 
 int main(int argc, char** argv) {

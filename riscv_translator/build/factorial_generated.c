@@ -67,60 +67,7 @@ void init_memory(const char* elf_path) {
 int64_t run_cpu() {
     RegisterFile cpu = {0};
     cpu.regs[2] = 0x7FFFFFF0;
-    cpu.regs[1] = 0xDEADBEEF;
-    //jump table (O(1) access, longer build time)
-    static void* label_map[] = {
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x111c8,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x111dc,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x111e8,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x111f4,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x11208,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x1121c,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x1122c,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_0x11238,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-        &&L_INVALID_TARGET,
-    };
-    uint64_t base_address = 0x11190ULL;
-
+    cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;
     goto L_0x11190;
 L_0x11190:
     // addi sp, sp, -0x30
@@ -226,16 +173,10 @@ L_0x11238:
     // addi sp, sp, 0x30
     cpu.regs[2] = cpu.regs[2] + 48;
     // ret 
-    if (cpu.regs[1] != 0xDEADBEEF) {
-        goto *label_map[(cpu.regs[1] - base_address) / 4];
-    } else {
-        return cpu.a0;
-    }
+    goto *(void *)cpu.regs[1];
 
-
-L_INVALID_TARGET:
-    fprintf(stderr, "invalid target hit\n");
-    exit(1);
+L_RETFROMMAIN:
+    return cpu.regs[10];
 }
 
 int main(int argc, char** argv) {
