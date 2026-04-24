@@ -10,9 +10,12 @@
 #include <fcntl.h>    
 #include <unistd.h>
 #include <sys/stat.h>
+#include <map>
 
 //print the C header for the stuff we need to run
 void print_header() {
+	//libraries needed by default
+	//TODO: check if we can take any of these out
         printf("#include <stdint.h>\n");
         printf("#include <stdio.h>\n");
         printf("#include <stdlib.h>\n");
@@ -35,12 +38,13 @@ void print_header() {
 	printf("    int64_t regs[32];\n\n");
 	printf("} RegisterFile;\n\n");
 
-	//create variables for the memory pointer and the program entry point
+	//create variables for the memory pointer
         printf("uint8_t* memory = NULL;\n");
+	printf("\n");
 }
 
 
-//sets up the memory space and reads in the PTLOAD sections of the ELF
+//prints logic to set up the memory space and read in the PTLOAD sections of the ELF
 void print_init_memory() {
 	printf("void init_memory(const char* elf_path) {\n");
 	printf("    // 1. Reserve 4GB virtual address space\n");
@@ -70,7 +74,9 @@ void print_init_memory() {
 	printf("    // 4. Load Program Headers\n");
 	printf("    Elf64_Phdr* phdrs = malloc(sizeof(Elf64_Phdr) * ehdr.e_phnum);\n");
 	printf("    lseek(fd, ehdr.e_phoff, SEEK_SET);\n");
-	printf("    read(fd, phdrs, sizeof(Elf64_Phdr) * ehdr.e_phnum);\n\n");
+	printf("    if (!read(fd, phdrs, sizeof(Elf64_Phdr) * ehdr.e_phnum)) {\n\n");
+	printf("        fprintf(stderr, \"Error: failed to read program headers\\n\"); exit(1);\n");
+	printf("    }\n\n");
 
 	printf("    // 5. Load PT_LOAD segments\n");
 	printf("    for (int i = 0; i < ehdr.e_phnum; i++) {\n");
@@ -101,8 +107,64 @@ void print_main() {
 	printf("}\n");
 }
 
+
+
+//---------------SYMBOL TABLE PARSING FOR FUNCTION REPLACEMENT-----------------//
+
+std::map<uint64_t, std::string> collect_symbols(uint8_t* elf_start) {
+	std::map<uint64_t, std::string> symbol_map;
+
+	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)elf_start;
+
+	Elf64_Shdr* shdrs = (Elf64_Shdr*)(elf_start + ehdr->e_shoff);
+	char* shstrtab = (char*)(elf_start + shdrs[ehdr->e_shstrndx].sh_offset);
+
+	//find the section headers
+	//TODO: expand this function to do the logic that locates the text section (currently handled by main)
+	for (int i = 0; i < ehdr->e_shnum; i++) {
+		//SHT_SYMTAB (static symbols) or SHT_DYNSYM (dynamic symbols)
+		if (shdrs[i].sh_type == SHT_SYMTAB || shdrs[i].sh_type == SHT_DYNSYM) {
+			Elf64_Sym* syms = (Elf64_Sym*)(elf_start + shdrs[i].sh_offset);
+			int symbol_count = shdrs[i].sh_size / sizeof(Elf64_Sym);
+
+			// The string table for this symbol table is linked via sh_link
+			char* strtab = (char*)(elf_start + shdrs[shdrs[i].sh_link].sh_offset);
+
+			for (int j = 0; j < symbol_count; j++) {
+				// Get the name from the string table
+				std::string name = strtab + syms[j].st_name;
+
+				// Only map function symbols (STT_FUNC) that have a name and address
+				if (!name.empty() && syms[j].st_value != 0) {
+					// STB_GLOBAL or STB_LOCAL is fine
+					symbol_map[syms[j].st_value] = name;
+
+					//logging
+					fprintf(stderr, "[Symbol Mapper] Found %s at 0x%lx\n", name.c_str(), syms[j].st_value);
+				}
+			}
+		}
+	}
+
+	return symbol_map;
+}
+
+
+
+
+
+
+
+//-----------------------------------------------------------------------------//
+
+
+
+
+
 //-----------BRANCH COLLECTION HELPERS + regtoindex translation-------------//
 
+//boolean function to determine if an instruction is labeled by capstones
+//branching instruction labels
 bool is_branch(cs_insn *insn) {
         cs_detail *detail = insn->detail;
         if (!detail) return false;
@@ -119,7 +181,10 @@ bool is_branch(cs_insn *insn) {
         return false;
 }
 
-
+//given a branching instruction, we return the target address
+//for jumps not calculable by this function we are likely 
+//jumping to another region of memory like the bss or something
+//and we wont need a target there
 uint64_t get_branch_target(cs_insn *insn) {
     cs_riscv *riscv = &insn->detail->riscv;
 
@@ -136,6 +201,7 @@ uint64_t get_branch_target(cs_insn *insn) {
     return 0;
 }
 
+//convert the register ID to an index for my reg file union
 int reg_to_index(unsigned int reg) {
         if (reg >= RISCV_REG_X0 && reg <= RISCV_REG_X31) {
                 return reg - RISCV_REG_X0;
@@ -187,6 +253,7 @@ std::set<uint64_t> collect_branch_targets(csh handle, const uint8_t *code_ptr, s
 					}
 				}				
 			}
+			//if aiupc and the next is not a jalr, it will fall through and still catch branches
 
 			//check if it is a branch and if it is and the immediate exists add to targets
                         if (is_branch(insn) && insn->id != RISCV_INS_JALR) {
@@ -216,6 +283,7 @@ std::set<uint64_t> collect_branch_targets(csh handle, const uint8_t *code_ptr, s
 
 void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint64_t main_addr) {
         printf("    // %s %s\n", insn->mnemonic, insn->op_str);
+	//populate details structure
         cs_riscv *riscv = &(insn->detail->riscv);
 
         switch (insn->id) {
@@ -230,6 +298,8 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] + %ld;\n", rd, rs1, imm);
                         break;
                 }
+
+		//add word
                 case RISCV_INS_ADDIW: {
                         int rd = reg_to_index(riscv->operands[0].reg);
                         int rs1 = reg_to_index(riscv->operands[1].reg);
@@ -249,6 +319,8 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] + cpu.regs[%d];\n", rd, rs1, rs2);
                         break;
                 }
+
+		//add word instruction
                 case RISCV_INS_ADDW: {
                         int rd = reg_to_index(riscv->operands[0].reg);
                         int rs1 = reg_to_index(riscv->operands[1].reg);
@@ -269,6 +341,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
+		//subtract word instruction
                 case RISCV_INS_SUBW: {
                         int rd = reg_to_index(riscv->operands[0].reg);
                         int rs1 = reg_to_index(riscv->operands[1].reg);
@@ -317,7 +390,6 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         printf("    if (cpu.regs[%d] == cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
                         break;
                 }
-
 
                 //branch not equal
                 case RISCV_INS_BNE: {
@@ -390,7 +462,6 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
-
                 //load double instruction
                 case RISCV_INS_LD: {
                         int rd = reg_to_index(riscv->operands[0].reg);
@@ -429,11 +500,6 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
-
-
-
-
-
 		case RISCV_INS_AUIPC: {
 			int rd = reg_to_index(riscv->operands[0].reg);
 			int64_t imm = (int64_t)riscv->operands[1].imm << 12;	
@@ -466,7 +532,19 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 
 
 }
-void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets) {
+
+//used to determine if we are replacing
+bool is_replaceable_function(std::string func_name) {
+	if (func_name == "printf") {
+		return true;
+	} else {
+		return false;
+	}	
+
+}
+
+//print the function that acts as the functional eq of the text section
+void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, std::string>& symbols) {
 	printf("int64_t run_cpu() {\n");
 	printf("    RegisterFile cpu = {0};\n");
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
@@ -482,59 +560,77 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 			address += 4;
 			printf("//-------------CUSTOM INSTRUCTION ENCOUNTERED------------\n");
 			continue;
-        }
+        	}
 
-        // Print label if it's a branch target
-	if (targets.count(insn->address) || insn->address == main_addr) {
-		printf("L_0x%lx:\n", insn->address);
-	}
-
-	cs_riscv *riscv = &(insn->detail->riscv);
-
-        //CHECK FOR AUIPC + JALR
-	if (insn->id == RISCV_INS_AUIPC && code_size >= 4) {
-		int rd = reg_to_index(riscv->operands[0].reg);
-		int64_t auipc_imm = riscv->operands[1].imm;
-		uint64_t auipc_pc = insn->address;
-
-		//NEXT instruction peak, get tmp values to inspect
-		cs_insn *next_insn = cs_malloc(handle);
-		const uint8_t *tmp_ptr = code_ptr;
-		size_t tmp_size = code_size;
-		uint64_t tmp_addr = address;
-
-		if (cs_disasm_iter(handle, &tmp_ptr, &tmp_size, &tmp_addr, next_insn)) {
-
-                	cs_riscv *next_riscv = &(next_insn->detail->riscv);
-                
-                	// If it's a JALR using the register we just set	
-			if (next_insn->id == RISCV_INS_JALR && reg_to_index(next_riscv->operands[1].reg) == rd) {
-				uint64_t target = (auipc_pc + auipc_imm + next_riscv->operands[2].imm) & ~1ULL;
-				uint64_t ret_addr = next_insn->address + 4;
-		
-				printf("    // Optimized AUIPC + JALR -> Static Goto\n");
-				printf("    cpu.regs[1] = (int64_t)&&L_0x%lx;\n", ret_addr);
-                    		printf("    goto L_0x%lx;\n", target);
-
-                    		// Consumed the next instruction, so update real pointers
-                    		code_ptr = tmp_ptr;
-                    		code_size = tmp_size;
-                    		address = tmp_addr;
-                    		cs_free(next_insn, 1);
-                    		continue; // Done with this pair
-                	}
+        	// Print label if it's a branch target
+		if (targets.count(insn->address) || insn->address == main_addr) {
+			printf("L_0x%lx:\n", insn->address);
 		}
+
+		//populate the details structure
+		cs_riscv *riscv = &(insn->detail->riscv);
+
+        	//CHECK FOR AUIPC + JALR
+		if (insn->id == RISCV_INS_AUIPC && code_size >= 4) {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int64_t auipc_imm = riscv->operands[1].imm;
+			uint64_t auipc_pc = insn->address;
+
+			//NEXT instruction peak, get tmp values to inspect
+			cs_insn *next_insn = cs_malloc(handle);
+			const uint8_t *tmp_ptr = code_ptr;
+			size_t tmp_size = code_size;
+			uint64_t tmp_addr = address;
+
+			if (cs_disasm_iter(handle, &tmp_ptr, &tmp_size, &tmp_addr, next_insn)) {
+
+                		cs_riscv *next_riscv = &(next_insn->detail->riscv);
+                
+                		// If it's a JALR using the register we just set	
+				if (next_insn->id == RISCV_INS_JALR && reg_to_index(next_riscv->operands[1].reg) == rd) {
+					uint64_t target = (auipc_pc + auipc_imm + next_riscv->operands[2].imm) & ~1ULL;
+					uint64_t ret_addr = next_insn->address + 4;
+					auto find_iterator = symbols.find(target);
+					
+					//TODO: This identifies the symbol for the target here, I need to be able to compile the riscv stuff
+					//with the stdlib stuff in order to test if this works
+					//when I can do that we need to write a function that identifies which one we are looking at and replaces with the
+					//appropriate call. once this works, we will add the same functionality to JAL instructions
+					if (find_iterator != symbols.end()) {
+						//symbol exists
+						//gets the symbol string: printf("%s\n", find_iterator->second.c_str());
+						if (is_replaceable_function(find_iterator->second)) {
+							printf("IDENTIFIED PRINTF\n");
+						}	
+					} else {
+						//doesn't exist
+					}
 		
-		cs_free(next_insn, 1);
-        }
+					printf("    //AUIPC + JALR -> Static Goto\n");
+					printf("    cpu.regs[1] = (int64_t)&&L_0x%lx;\n", ret_addr);
+                    			printf("    goto L_0x%lx;\n", target);
 
-        // If we didn't 'continue' from the AUIPC+JALR block
-        translate_to_c(handle, insn, targets, main_addr);
-    }
+                    			// Consumed the next instruction, so update real pointers
+                    			code_ptr = tmp_ptr;
+                    			code_size = tmp_size;
+                    			address = tmp_addr;
+                    			cs_free(next_insn, 1);
+                    			continue; // Done with this pair
+                		}
+			}
+		
+			cs_free(next_insn, 1);
+        	}
 
-    printf("\nL_RETFROMMAIN:\n");
-    printf("    return cpu.regs[10];\n");
-    printf("}\n");
+        	// If we didn't encounter a auipc + jalr pair
+        	translate_to_c(handle, insn, targets, main_addr);
+	}
+	
+	//label pointer to this label will be pushed onto stack
+	//at RIP before entering main, if we see it in a ret, jump here	
+	printf("\nL_RETFROMMAIN:\n");
+	printf("    return cpu.regs[10];\n");
+	printf("}\n");
 }
 
 
@@ -563,16 +659,15 @@ int main(int argc, char** argv) {
 	}
 	close(fd);
 
+	//check elf structure
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)elf_buffer.data();
 	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
 		perror("Not a valid ELF file\n");
 		exit(1);
 	}
 
-	//entry point should be main because I'm compiling it that way
-	//TODO: do I still need to do it like that??
+	//entry point should be main because we are compiling it that way
 	uint64_t entry_point = ehdr->e_entry;
-
 
 	//get pointer to section headers
 	Elf64_Shdr* shdrs = (Elf64_Shdr*)(elf_buffer.data() + ehdr->e_shoff);
@@ -584,7 +679,6 @@ int main(int argc, char** argv) {
 	uint64_t text_section_addr = 0;
 	size_t text_size = 0;
 
-
 	//iterate through the section headers
 	for (int i = 0; i < ehdr->e_shnum; i++) {
         	//collect the name of this header
@@ -592,6 +686,7 @@ int main(int argc, char** argv) {
         
         	// Locate text section
         	if (sname == ".text") {
+			//get info required to isolate text section
             		text_section_ptr = elf_buffer.data() + shdrs[i].sh_offset;
             		text_section_addr = shdrs[i].sh_addr;
             		text_size = shdrs[i].sh_size;
@@ -612,16 +707,26 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 
-	//tells capstone to populate the detail struct
+	//tells capstone we will need the details of each instruction
 	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_insn *insn = cs_malloc(handle);
 
-	std::set<uint64_t> targets = collect_branch_targets(handle, text_section_ptr, text_size, text_section_addr, insn);
+	//collect branch targets for label printing in run_cpu
+	std::set<uint64_t> targets = collect_branch_targets(handle, text_section_ptr, text_size, text_section_addr, insn); //parse for targets
+	std::map<uint64_t, std::string> symbols = collect_symbols(elf_buffer.data()); //symbol table parse
 
+	//test symbols
+	//TODO: delete
+	//for (const auto& [addr, name] : symbols) {
+        //	std::cout <<  std::hex << addr << ": " << name << "\n";
+    	//}
+	
+
+
+	//print the file (will go to stdout, needs to be captured)
 	print_header();
-	printf("\n");
 	print_init_memory();
-	print_run_cpu(handle, text_section_ptr, text_size, text_section_addr, insn, entry_point, targets);
+	print_run_cpu(handle, text_section_ptr, text_size, text_section_addr, insn, entry_point, targets, symbols);
 	print_main();
 	return 0;
 }

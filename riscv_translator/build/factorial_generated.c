@@ -48,7 +48,10 @@ void init_memory(const char* elf_path) {
     // 4. Load Program Headers
     Elf64_Phdr* phdrs = malloc(sizeof(Elf64_Phdr) * ehdr.e_phnum);
     lseek(fd, ehdr.e_phoff, SEEK_SET);
-    read(fd, phdrs, sizeof(Elf64_Phdr) * ehdr.e_phnum);
+    if (!read(fd, phdrs, sizeof(Elf64_Phdr) * ehdr.e_phnum)) {
+
+        fprintf(stderr, "Error: failed to read program headers\n"); exit(1);
+    }
 
     // 5. Load PT_LOAD segments
     for (int i = 0; i < ehdr.e_phnum; i++) {

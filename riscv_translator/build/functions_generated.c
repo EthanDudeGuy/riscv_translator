@@ -48,7 +48,10 @@ void init_memory(const char* elf_path) {
     // 4. Load Program Headers
     Elf64_Phdr* phdrs = malloc(sizeof(Elf64_Phdr) * ehdr.e_phnum);
     lseek(fd, ehdr.e_phoff, SEEK_SET);
-    read(fd, phdrs, sizeof(Elf64_Phdr) * ehdr.e_phnum);
+    if (!read(fd, phdrs, sizeof(Elf64_Phdr) * ehdr.e_phnum)) {
+
+        fprintf(stderr, "Error: failed to read program headers\n"); exit(1);
+    }
 
     // 5. Load PT_LOAD segments
     for (int i = 0; i < ehdr.e_phnum; i++) {
@@ -68,7 +71,7 @@ int64_t run_cpu() {
     RegisterFile cpu = {0};
     cpu.regs[2] = 0x7FFFFFF0;
     cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;
-    goto L_0x111c8;
+    goto L_0x11270;
 L_0x11190:
     // addi sp, sp, -0x20
     cpu.regs[2] = cpu.regs[2] + -32;
@@ -99,14 +102,107 @@ L_0x11190:
     // ret 
     goto *(void *)cpu.regs[1];
 L_0x111c8:
-    // addi sp, sp, -0x20
-    cpu.regs[2] = cpu.regs[2] + -32;
-    // sd ra, 0x18(sp)
-    *(int64_t*)(memory + cpu.regs[2] + 24) = cpu.regs[1];
-    // sd s0, 0x10(sp)
-    *(int64_t*)(memory + cpu.regs[2] + 16) = cpu.regs[8];
-    // addi s0, sp, 0x20
-    cpu.regs[8] = cpu.regs[2] + 32;
+    // addi sp, sp, -0x30
+    cpu.regs[2] = cpu.regs[2] + -48;
+    // sd ra, 0x28(sp)
+    *(int64_t*)(memory + cpu.regs[2] + 40) = cpu.regs[1];
+    // sd s0, 0x20(sp)
+    *(int64_t*)(memory + cpu.regs[2] + 32) = cpu.regs[8];
+    // addi s0, sp, 0x30
+    cpu.regs[8] = cpu.regs[2] + 48;
+    // sw a0, -0x18(s0)
+    *(int32_t*)(memory + cpu.regs[8] + -24) = (int32_t)(cpu.regs[10]);
+    // addi a0, zero, 1
+    cpu.regs[10] = cpu.regs[0] + 1;
+    // sd a0, -0x20(s0)
+    *(int64_t*)(memory + cpu.regs[8] + -32) = cpu.regs[10];
+    // lw a0, -0x18(s0)
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
+    // beqz a0, 0x18
+    if (cpu.regs[10] == cpu.regs[0]) goto L_0x11200;
+    // j 4
+    goto L_0x111f0;
+L_0x111f0:
+    // lw a0, -0x18(s0)
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
+    // addi a1, zero, 1
+    cpu.regs[11] = cpu.regs[0] + 1;
+    // bne a0, a1, 0x14
+    if (cpu.regs[10] != cpu.regs[11]) goto L_0x1120c;
+    // j 4
+    goto L_0x11200;
+L_0x11200:
+    // addi a0, zero, 1
+    cpu.regs[10] = cpu.regs[0] + 1;
+    // sw a0, -0x14(s0)
+    *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
+    // j 0x50
+    goto L_0x11258;
+L_0x1120c:
+    // addi a0, zero, 2
+    cpu.regs[10] = cpu.regs[0] + 2;
+    // sw a0, -0x24(s0)
+    *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
+    // j 4
+    goto L_0x11218;
+L_0x11218:
+    // lw a1, -0x24(s0)
+    cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
+    // lw a0, -0x18(s0)
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
+    // bltu a0, a1, 0x2c
+    if ((uint64_t)cpu.regs[10] < (uint64_t)cpu.regs[11]) goto L_0x1124c;
+    // j 4
+    goto L_0x11228;
+L_0x11228:
+    // lwu a1, -0x24(s0)
+    cpu.regs[11] = (int64_t)*(uint32_t*)(memory + cpu.regs[8] + -36);
+    // ld a0, -0x20(s0)
+    cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -32);
+    // mul a0, a0, a1
+    cpu.regs[10] = cpu.regs[10] * cpu.regs[11];
+    // sd a0, -0x20(s0)
+    *(int64_t*)(memory + cpu.regs[8] + -32) = cpu.regs[10];
+    // j 4
+    goto L_0x1123c;
+L_0x1123c:
+    // lw a0, -0x24(s0)
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
+    // addiw a0, a0, 1
+    cpu.regs[10] = (int64_t)(int32_t)(cpu.regs[10] + 1);
+    // sw a0, -0x24(s0)
+    *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
+    // j -0x30
+    goto L_0x11218;
+L_0x1124c:
+    // ld a0, -0x20(s0)
+    cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -32);
+    // sw a0, -0x14(s0)
+    *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
+    // j 4
+    goto L_0x11258;
+L_0x11258:
+    // lw a0, -0x14(s0)
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -20);
+    // addi sp, s0, -0x30
+    cpu.regs[2] = cpu.regs[8] + -48;
+    // ld ra, 0x28(sp)
+    cpu.regs[1] = *(int64_t*)(memory + cpu.regs[2] + 40);
+    // ld s0, 0x20(sp)
+    cpu.regs[8] = *(int64_t*)(memory + cpu.regs[2] + 32);
+    // addi sp, sp, 0x30
+    cpu.regs[2] = cpu.regs[2] + 48;
+    // ret 
+    goto *(void *)cpu.regs[1];
+L_0x11270:
+    // addi sp, sp, -0x30
+    cpu.regs[2] = cpu.regs[2] + -48;
+    // sd ra, 0x28(sp)
+    *(int64_t*)(memory + cpu.regs[2] + 40) = cpu.regs[1];
+    // sd s0, 0x20(sp)
+    *(int64_t*)(memory + cpu.regs[2] + 32) = cpu.regs[8];
+    // addi s0, sp, 0x30
+    cpu.regs[8] = cpu.regs[2] + 48;
     // mv a0, zero
     cpu.regs[10] = cpu.regs[0] + 0;
     // sw a0, -0x14(s0)
@@ -121,24 +217,34 @@ L_0x111c8:
     *(int32_t*)(memory + cpu.regs[8] + -28) = (int32_t)(cpu.regs[10]);
     // lw a0, -0x18(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
-    // lw a1, -0x1c(s0)
-    cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -28);
-    // Optimized AUIPC + JALR -> Static Goto
-    cpu.regs[1] = (int64_t)&&L_0x11200;
+    // lui a1, 0x12
+    cpu.regs[11] = (int64_t)(int32_t)(0x12 << 12);
+    // lw a1, 0x2d8(a1)
+    cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[11] + 728);
+    //AUIPC + JALR -> Static Goto
+    cpu.regs[1] = (int64_t)&&L_0x112ac;
     goto L_0x11190;
-L_0x11200:
+L_0x112ac:
     // sw a0, -0x20(s0)
     *(int32_t*)(memory + cpu.regs[8] + -32) = (int32_t)(cpu.regs[10]);
     // lw a0, -0x20(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -32);
-    // addi sp, s0, -0x20
-    cpu.regs[2] = cpu.regs[8] + -32;
-    // ld ra, 0x18(sp)
-    cpu.regs[1] = *(int64_t*)(memory + cpu.regs[2] + 24);
-    // ld s0, 0x10(sp)
-    cpu.regs[8] = *(int64_t*)(memory + cpu.regs[2] + 16);
-    // addi sp, sp, 0x20
-    cpu.regs[2] = cpu.regs[2] + 32;
+    //AUIPC + JALR -> Static Goto
+    cpu.regs[1] = (int64_t)&&L_0x112bc;
+    goto L_0x111c8;
+L_0x112bc:
+    // sw a0, -0x24(s0)
+    *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
+    // lw a0, -0x24(s0)
+    cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
+    // addi sp, s0, -0x30
+    cpu.regs[2] = cpu.regs[8] + -48;
+    // ld ra, 0x28(sp)
+    cpu.regs[1] = *(int64_t*)(memory + cpu.regs[2] + 40);
+    // ld s0, 0x20(sp)
+    cpu.regs[8] = *(int64_t*)(memory + cpu.regs[2] + 32);
+    // addi sp, sp, 0x30
+    cpu.regs[2] = cpu.regs[2] + 48;
     // ret 
     goto *(void *)cpu.regs[1];
 

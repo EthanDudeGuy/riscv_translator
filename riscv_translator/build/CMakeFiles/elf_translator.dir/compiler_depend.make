@@ -262,8 +262,33 @@ CMakeFiles/elf_translator.dir/generate_c_with_function_support.cpp.o: ../generat
   /usr/include/asm-generic/posix_types.h \
   /usr/include/x86_64-linux-gnu/bits/statx-generic.h \
   /usr/include/x86_64-linux-gnu/bits/types/struct_statx_timestamp.h \
-  /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h
+  /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h \
+  /usr/include/c++/11/map \
+  /usr/include/c++/11/bits/stl_map.h \
+  /usr/include/c++/11/tuple \
+  /usr/include/c++/11/utility \
+  /usr/include/c++/11/bits/stl_relops.h \
+  /usr/include/c++/11/array \
+  /usr/include/c++/11/bits/uses_allocator.h \
+  /usr/include/c++/11/bits/invoke.h \
+  /usr/include/c++/11/bits/stl_multimap.h
 
+
+/usr/include/c++/11/bits/stl_multimap.h:
+
+/usr/include/c++/11/bits/invoke.h:
+
+/usr/include/c++/11/bits/uses_allocator.h:
+
+/usr/include/c++/11/array:
+
+/usr/include/c++/11/bits/stl_relops.h:
+
+/usr/include/c++/11/tuple:
+
+/usr/include/c++/11/bits/stl_map.h:
+
+/usr/include/c++/11/map:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h:
 
@@ -692,6 +717,8 @@ CMakeFiles/elf_translator.dir/generate_c_with_function_support.cpp.o: ../generat
 /usr/include/c++/11/system_error:
 
 /usr/include/c++/11/bits/stl_vector.h:
+
+/usr/include/c++/11/utility:
 
 /usr/include/c++/11/ios:
 
