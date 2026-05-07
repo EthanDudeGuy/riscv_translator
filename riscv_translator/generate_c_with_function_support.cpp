@@ -12,6 +12,11 @@
 #include <sys/stat.h>
 #include <map>
 
+struct SymbolInfo {
+	std::string name;
+	uint64_t size;
+};
+
 //print the C header for the stuff we need to run
 void print_header() {
 	//libraries needed by default
@@ -111,18 +116,27 @@ void print_main() {
 
 //---------------SYMBOL TABLE PARSING FOR FUNCTION REPLACEMENT-----------------//
 
-std::map<uint64_t, std::string> collect_symbols(uint8_t* elf_start) {
-	std::map<uint64_t, std::string> symbol_map;
+
+
+std::map<uint64_t, SymbolInfo> collect_symbols(uint8_t* elf_start) {
+	std::map<uint64_t, SymbolInfo> symbol_map;
 
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)elf_start;
-
 	Elf64_Shdr* shdrs = (Elf64_Shdr*)(elf_start + ehdr->e_shoff);
 	char* shstrtab = (char*)(elf_start + shdrs[ehdr->e_shstrndx].sh_offset);
 
+	uint64_t plt_base_addr = 0;
+
 	//find the section headers
-	//TODO: expand this function to do the logic that locates the text section (currently handled by main)
+	//TODO: maybe expand this function to do the logic that locates the text section (currently handled by main)
 	for (int i = 0; i < ehdr->e_shnum; i++) {
 		//SHT_SYMTAB (static symbols) or SHT_DYNSYM (dynamic symbols)
+		
+		std::string sname = shstrtab + shdrs[i].sh_name;
+		if (sname == ".plt") {
+			plt_base_addr = shdrs[i].sh_addr;
+		}
+
 		if (shdrs[i].sh_type == SHT_SYMTAB || shdrs[i].sh_type == SHT_DYNSYM) {
 			Elf64_Sym* syms = (Elf64_Sym*)(elf_start + shdrs[i].sh_offset);
 			int symbol_count = shdrs[i].sh_size / sizeof(Elf64_Sym);
@@ -137,10 +151,43 @@ std::map<uint64_t, std::string> collect_symbols(uint8_t* elf_start) {
 				// Only map function symbols (STT_FUNC) that have a name and address
 				if (!name.empty() && syms[j].st_value != 0) {
 					// STB_GLOBAL or STB_LOCAL is fine
-					symbol_map[syms[j].st_value] = name;
+					symbol_map[syms[j].st_value] = {name, syms[j].st_size};
 
-					//logging
-					fprintf(stderr, "[Symbol Mapper] Found %s at 0x%lx\n", name.c_str(), syms[j].st_value);
+					fprintf(stderr, "[Symbol Mapper] Found %s at 0x%lx (size: %lu bytes)\n", name.c_str(), syms[j].st_value, syms[j].st_size);
+				}
+			}
+		}
+	}
+
+	//find named stubs in the plt to look for external functions to be replaced
+	if (plt_base_addr != 0) {
+		for (int i = 0; i < ehdr->e_shnum; i++) {
+			if (shdrs[i].sh_type == SHT_RELA) {
+				std::string sname = shstrtab + shdrs[i].sh_name;
+				if (sname == ".rela.plt") {
+					Elf64_Rela* relas = (Elf64_Rela*)(elf_start + shdrs[i].sh_offset);
+					int count = shdrs[i].sh_size / sizeof(Elf64_Rela);
+
+					// Find the dynamic symbol table (.dynsym) used by this relocation section
+					Elf64_Shdr* dynsym_shdr = &shdrs[shdrs[i].sh_link];
+					Elf64_Sym* dynsyms = (Elf64_Sym*)(elf_start + dynsym_shdr->sh_offset);
+					char* dynstrtab = (char*)(elf_start + shdrs[dynsym_shdr->sh_link].sh_offset);
+
+					// The first stub starts after the 32-byte PLT header
+					uint64_t current_stub_addr = plt_base_addr + 32;
+
+					for (int j = 0; j < count; j++) {
+						int sym_idx = ELF64_R_SYM(relas[j].r_info);
+						std::string sym_name = dynstrtab + dynsyms[sym_idx].st_name;
+
+						// Map the executable stub address (0x18f0 etc) to the function name
+						symbol_map[current_stub_addr] = {sym_name + "@plt", 16};
+
+						fprintf(stderr, "[PLT Mapper] Mapped stub at 0x%lx to %s\n", current_stub_addr, sym_name.c_str());
+
+						// Move to next 16-byte stub
+						current_stub_addr += 16;
+					}
 				}
 			}
 		}
@@ -148,10 +195,6 @@ std::map<uint64_t, std::string> collect_symbols(uint8_t* elf_start) {
 
 	return symbol_map;
 }
-
-
-
-
 
 
 
@@ -502,7 +545,8 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 
 		case RISCV_INS_AUIPC: {
 			int rd = reg_to_index(riscv->operands[0].reg);
-			int64_t imm = (int64_t)riscv->operands[1].imm << 12;	
+			//cast to 32 bit so it rolls over to negative, issue with printf before
+			int64_t imm = (int32_t)riscv->operands[1].imm << 12;	
 			uint64_t pc = insn->address;
 
 			if (rd != 0) {
@@ -535,7 +579,8 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 
 //used to determine if we are replacing
 bool is_replaceable_function(std::string func_name) {
-	if (func_name == "printf") {
+	printf("//--CALL TO FUNCTION NAMED: %s ------------------\n", func_name.c_str());
+	if (func_name == "printf@plt") {
 		return true;
 	} else {
 		return false;
@@ -543,8 +588,20 @@ bool is_replaceable_function(std::string func_name) {
 
 }
 
+//TODO: replace with linked trusted implementation
+void printf_to_c() {
+	printf("        //Library Call to printf\n");
+	printf("        {\n");
+	printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
+	// This only handles the case where there are NO % arguments. 
+	printf("            printf(\"%%s\", fmt);\n"); 
+	printf("            fflush(stdout);\n");
+	printf("            cpu.regs[10] = 0;\n");
+	printf("        }\n");
+}
+
 //print the function that acts as the functional eq of the text section
-void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, std::string>& symbols) {
+void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, SymbolInfo>& symbols) {
 	printf("int64_t run_cpu() {\n");
 	printf("    RegisterFile cpu = {0};\n");
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
@@ -552,7 +609,40 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 	printf("    goto L_0x%lx;\n", main_addr);
 
 	while (code_size > 0) {
-		//get current insn
+		//skip compiler generated bookkeeping functions, we handle setup ourselves and will not
+		//actually be linking to the stdlib the binary thinks		
+		if (symbols.count(address)) {
+			SymbolInfo info = symbols[address];
+			
+			if (info.name == "_start" || info.name == "deregister_tm_clones" || 
+			    info.name == "register_tm_clones" || info.name == "__do_global_dtors_aux" || 
+			    info.name == "frame_dummy" || info.name == "load_gp"  || info.name == "$x") {
+			    
+			    // 1. Find the next symbol in the map to determine how much to skip
+			    auto it = symbols.find(address);
+			    it++; // Move to next symbol
+			    
+			    uint64_t next_addr;
+			    if (it != symbols.end()) {
+				next_addr = it->first;
+			    } else {
+				// If there is no next symbol, skip to the end of the section
+				next_addr = address + code_size; 
+			    }
+
+			    uint64_t actual_skip = next_addr - address;
+			    
+			    printf("// Skipping compiler-generated function: %s (%lu bytes)\n", info.name.c_str(), actual_skip);
+			    
+			    address += actual_skip;
+			    code_ptr += actual_skip;
+			    code_size -= actual_skip;
+			    continue; 
+			}
+			
+			printf("\n// --- Function: %s ---\n", info.name.c_str());
+	    	}			
+
 		if (!cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn)) {
 			// Handle custom
 			code_ptr += 4;
@@ -591,24 +681,19 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 					uint64_t target = (auipc_pc + auipc_imm + next_riscv->operands[2].imm) & ~1ULL;
 					uint64_t ret_addr = next_insn->address + 4;
 					auto find_iterator = symbols.find(target);
-					
-					//TODO: This identifies the symbol for the target here, I need to be able to compile the riscv stuff
-					//with the stdlib stuff in order to test if this works
-					//when I can do that we need to write a function that identifies which one we are looking at and replaces with the
-					//appropriate call. once this works, we will add the same functionality to JAL instructions
-					if (find_iterator != symbols.end()) {
-						//symbol exists
-						//gets the symbol string: printf("%s\n", find_iterator->second.c_str());
-						if (is_replaceable_function(find_iterator->second)) {
-							printf("IDENTIFIED PRINTF\n");
-						}	
+				
+						
+					if (find_iterator != symbols.end() && is_replaceable_function(find_iterator->second.name.c_str())) {
+						//symbol exists and is one of our replaceable functions
+						printf_to_c();	
 					} else {
-						//doesn't exist
+						//doesn't exist, do regular logic, function in in translated C land
+
+						printf("    //AUIPC + JALR -> Static Goto\n");
+						printf("    cpu.regs[1] = (int64_t)&&L_0x%lx;\n", ret_addr);
+						printf("    goto L_0x%lx;\n", target);
 					}
 		
-					printf("    //AUIPC + JALR -> Static Goto\n");
-					printf("    cpu.regs[1] = (int64_t)&&L_0x%lx;\n", ret_addr);
-                    			printf("    goto L_0x%lx;\n", target);
 
                     			// Consumed the next instruction, so update real pointers
                     			code_ptr = tmp_ptr;
@@ -713,13 +798,13 @@ int main(int argc, char** argv) {
 
 	//collect branch targets for label printing in run_cpu
 	std::set<uint64_t> targets = collect_branch_targets(handle, text_section_ptr, text_size, text_section_addr, insn); //parse for targets
-	std::map<uint64_t, std::string> symbols = collect_symbols(elf_buffer.data()); //symbol table parse
+	std::map<uint64_t, SymbolInfo> symbols = collect_symbols(elf_buffer.data()); //symbol table parse
 
 	//test symbols
 	//TODO: delete
-	//for (const auto& [addr, name] : symbols) {
-        //	std::cout <<  std::hex << addr << ": " << name << "\n";
-    	//}
+	for (const auto& [addr, obj] : symbols) {
+        	std::cout <<  "//" << std::hex << addr << ": " << obj.name << "\n";
+    	}
 	
 
 
