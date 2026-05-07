@@ -1,26 +1,28 @@
-71: $d
-304: __abi_tag
-598: _IO_stdin_used
-59c: $d
-5d0: __FRAME_END__
-5f8: $d
-800: __global_pointer$
-168c: _start
-16b6: load_gp
-16c2: $x
-16e4: register_tm_clones
-1710: __do_global_dtors_aux
-174e: frame_dummy
-1758: addemup
-1790: factorial
-1838: main
-2908: __do_global_dtors_aux_fini_array_entry
-2910: __frame_dummy_init_array_entry
-2918: _DYNAMIC
-3af0: __data_start
-3af8: global
-3b00: __TMC_END__
-3b20: completed.0
+//71: $d
+//304: __abi_tag
+//598: _IO_stdin_used
+//59c: $d
+//5d0: __FRAME_END__
+//5f8: $d
+//800: __global_pointer$
+//168c: _start
+//16b6: load_gp
+//16c2: $x
+//16e4: register_tm_clones
+//1710: __do_global_dtors_aux
+//174e: frame_dummy
+//1758: addemup
+//1790: factorial
+//1838: main
+//18e0: __libc_start_main@plt
+//18f0: printf@plt
+//2908: __do_global_dtors_aux_fini_array_entry
+//2910: __frame_dummy_init_array_entry
+//2918: _DYNAMIC
+//3af0: __data_start
+//3af8: global
+//3b00: __TMC_END__
+//3b20: completed.0
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -243,12 +245,17 @@ L_0x1838:
     // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
     // auipc a0, 0xfffff
-    cpu.regs[10] = 0x1850ULL + 4294963200LL;
+    cpu.regs[10] = 0x1850ULL + -4096LL;
     // addi a0, a0, -0x2b4
     cpu.regs[10] = cpu.regs[10] + -692;
-    //AUIPC + JALR -> Static Goto
-    cpu.regs[1] = (int64_t)&&L_0x1860;
-    goto L_0x18f0;
+//--CALL TO FUNCTION NAMED: printf@plt ------------------
+        //Library Call to printf
+        {
+            char* fmt = (char*)(memory + cpu.regs[10]);
+            printf("%s", fmt);
+            fflush(stdout);
+            cpu.regs[10] = 0;
+        }
 L_0x1860:
     // addi a0, zero, 1
     cpu.regs[10] = cpu.regs[0] + 1;
@@ -266,7 +273,7 @@ L_0x1860:
     cpu.regs[11] = cpu.regs[11] + 644;
     // lw a1, 0(a1)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[11] + 0);
-//--FUNCTION NAMED: E›»ü _____---------------
+//--CALL TO FUNCTION NAMED: addemup ------------------
     //AUIPC + JALR -> Static Goto
     cpu.regs[1] = (int64_t)&&L_0x1888;
     goto L_0x1758;
@@ -275,7 +282,7 @@ L_0x1888:
     *(int32_t*)(memory + cpu.regs[8] + -32) = (int32_t)(cpu.regs[10]);
     // lw a0, -0x20(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -32);
-//--FUNCTION NAMED: E›»ü _____---------------
+//--CALL TO FUNCTION NAMED: factorial ------------------
     //AUIPC + JALR -> Static Goto
     cpu.regs[1] = (int64_t)&&L_0x1898;
     goto L_0x1790;
