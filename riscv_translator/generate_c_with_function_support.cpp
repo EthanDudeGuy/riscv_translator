@@ -229,19 +229,19 @@ bool is_branch(cs_insn *insn) {
 //jumping to another region of memory like the bss or something
 //and we wont need a target there
 uint64_t get_branch_target(cs_insn *insn) {
-    cs_riscv *riscv = &insn->detail->riscv;
+	cs_riscv *riscv = &insn->detail->riscv;
 
-    //is this a real instruction
-    if (riscv->op_count > 0) {
-        cs_riscv_op *last_op = &riscv->operands[riscv->op_count - 1];
+	//is this a real instruction
+	if (riscv->op_count > 0) {
+		cs_riscv_op *last_op = &riscv->operands[riscv->op_count - 1];
 
-        //if we have an immediate branch target
-        if (last_op->type == RISCV_OP_IMM) {
-            //Add the instruction address to the relative offset
-            return (uint64_t)(insn->address + last_op->imm);
-        }
-    }
-    return 0;
+		//if we have an immediate branch target
+		if (last_op->type == RISCV_OP_IMM) {
+			//Add the instruction address to the relative offset
+			return (uint64_t)(insn->address + last_op->imm);
+		}
+	}
+	return 0;
 }
 
 //convert the register ID to an index for my reg file union
@@ -602,6 +602,7 @@ void printf_to_c() {
 
 //print the function that acts as the functional eq of the text section
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, SymbolInfo>& symbols) {
+	//set up the stack and return address from main to stub
 	printf("int64_t run_cpu() {\n");
 	printf("    RegisterFile cpu = {0};\n");
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
@@ -618,26 +619,26 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 			    info.name == "register_tm_clones" || info.name == "__do_global_dtors_aux" || 
 			    info.name == "frame_dummy" || info.name == "load_gp"  || info.name == "$x") {
 			    
-			    // 1. Find the next symbol in the map to determine how much to skip
-			    auto it = symbols.find(address);
-			    it++; // Move to next symbol
+				// 1. Find the next symbol in the map to determine how much to skip
+				auto it = symbols.find(address);
+				it++; // Move to next symbol
 			    
-			    uint64_t next_addr;
-			    if (it != symbols.end()) {
-				next_addr = it->first;
-			    } else {
-				// If there is no next symbol, skip to the end of the section
-				next_addr = address + code_size; 
-			    }
+			    	uint64_t next_addr;
+			    	if (it != symbols.end()) {
+					next_addr = it->first;
+			    	} else {
+					// If there is no next symbol, skip to the end of the section
+					next_addr = address + code_size; 
+			    	}
 
-			    uint64_t actual_skip = next_addr - address;
+			    	uint64_t actual_skip = next_addr - address;
 			    
-			    printf("// Skipping compiler-generated function: %s (%lu bytes)\n", info.name.c_str(), actual_skip);
+			    	printf("// Skipping compiler-generated function: %s (%lu bytes)\n", info.name.c_str(), actual_skip);
 			    
-			    address += actual_skip;
-			    code_ptr += actual_skip;
-			    code_size -= actual_skip;
-			    continue; 
+			    	address += actual_skip;
+			    	code_ptr += actual_skip;
+			    	code_size -= actual_skip;
+			    	continue; 
 			}
 			
 			printf("\n// --- Function: %s ---\n", info.name.c_str());
@@ -685,7 +686,8 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 						
 					if (find_iterator != symbols.end() && is_replaceable_function(find_iterator->second.name.c_str())) {
 						//symbol exists and is one of our replaceable functions
-						printf_to_c();	
+						printf_to_c();
+						//this will become a generic function for replacing target lib functions	
 					} else {
 						//doesn't exist, do regular logic, function in in translated C land
 
@@ -778,12 +780,10 @@ int main(int argc, char** argv) {
         	}
 	}
 
-
 	if (!text_section_ptr) {
 		perror("couldn't find a text section\n");
 		exit(1);
 	}
-
 	
 	//init capstone for dissassembly
 	csh handle;
@@ -797,17 +797,16 @@ int main(int argc, char** argv) {
 	cs_insn *insn = cs_malloc(handle);
 
 	//collect branch targets for label printing in run_cpu
-	std::set<uint64_t> targets = collect_branch_targets(handle, text_section_ptr, text_size, text_section_addr, insn); //parse for targets
-	std::map<uint64_t, SymbolInfo> symbols = collect_symbols(elf_buffer.data()); //symbol table parse
+	std::set<uint64_t> targets = collect_branch_targets(handle, text_section_ptr, text_size, text_section_addr, insn);
+	//collect sybols and plt stubs for function replacement and compiler generated function skipping in run_cpu
+	std::map<uint64_t, SymbolInfo> symbols = collect_symbols(elf_buffer.data());
 
-	//test symbols
+	//test symbols (print as comments in file)
 	//TODO: delete
 	for (const auto& [addr, obj] : symbols) {
         	std::cout <<  "//" << std::hex << addr << ": " << obj.name << "\n";
     	}
 	
-
-
 	//print the file (will go to stdout, needs to be captured)
 	print_header();
 	print_init_memory();
