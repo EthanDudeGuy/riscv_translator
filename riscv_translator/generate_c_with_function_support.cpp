@@ -589,16 +589,29 @@ bool is_replaceable_function(std::string func_name) {
 }
 
 //TODO: replace with linked trusted implementation
-void printf_to_c() {
-	printf("        //Library Call to printf\n");
-	printf("        {\n");
-	printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
+//void printf_to_c() {
+//	printf("        //Library Call to printf\n");
+//	printf("        {\n");
+//	printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
 	// This only handles the case where there are NO % arguments. 
-	printf("            printf(\"%%s\", fmt);\n"); 
-	printf("            fflush(stdout);\n");
-	printf("            cpu.regs[10] = 0;\n");
-	printf("        }\n");
+//	printf("            printf(\"%%s\", fmt);\n"); 
+//	printf("            fflush(stdout);\n");
+//	printf("            cpu.regs[10] = 0;\n");
+//	printf("        }\n");
+//}
+
+void printf_to_c() {
+    printf("        // Library Call to printf (Interposed)\n");
+    printf("        {\n");
+    // a0 (regs[10]) is the format string
+    printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
+    // a1-a5 (regs[11-14]) are the potential arguments
+    printf("            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], cpu.regs[14]);\n");
+    printf("            fflush(stdout);\n");
+    printf("            cpu.regs[10] = 0; \n");
+    printf("        }\n");
 }
+
 
 //print the function that acts as the functional eq of the text section
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, SymbolInfo>& symbols) {

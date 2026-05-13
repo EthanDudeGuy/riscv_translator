@@ -1,28 +1,28 @@
 //71: $d
 //304: __abi_tag
 //598: _IO_stdin_used
-//59c: $d
-//5d0: __FRAME_END__
-//5f8: $d
+//5af: $d
+//5e8: __FRAME_END__
+//610: $d
 //800: __global_pointer$
-//168c: _start
-//16b6: load_gp
-//16c2: $x
-//16e4: register_tm_clones
-//1710: __do_global_dtors_aux
-//174e: frame_dummy
-//1758: addemup
-//1790: factorial
-//1838: main
-//18e0: __libc_start_main@plt
-//18f0: printf@plt
-//2908: __do_global_dtors_aux_fini_array_entry
-//2910: __frame_dummy_init_array_entry
-//2918: _DYNAMIC
-//3af0: __data_start
-//3af8: global
-//3b00: __TMC_END__
-//3b20: completed.0
+//16a4: _start
+//16ce: load_gp
+//16da: $x
+//16fc: register_tm_clones
+//1728: __do_global_dtors_aux
+//1766: frame_dummy
+//1770: addemup
+//17a8: factorial
+//1850: main
+//1900: __libc_start_main@plt
+//1910: printf@plt
+//2928: __do_global_dtors_aux_fini_array_entry
+//2930: __frame_dummy_init_array_entry
+//2938: _DYNAMIC
+//3b10: __data_start
+//3b18: global
+//3b20: __TMC_END__
+//3b40: completed.0
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,7 +96,7 @@ int64_t run_cpu() {
     RegisterFile cpu = {0};
     cpu.regs[2] = 0x7FFFFFF0;
     cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;
-    goto L_0x1838;
+    goto L_0x1850;
 // Skipping compiler-generated function: _start (42 bytes)
 // Skipping compiler-generated function: load_gp (12 bytes)
 // Skipping compiler-generated function: $x (34 bytes)
@@ -105,7 +105,7 @@ int64_t run_cpu() {
 // Skipping compiler-generated function: frame_dummy (10 bytes)
 
 // --- Function: addemup ---
-L_0x1758:
+L_0x1770:
     // addi sp, sp, -0x20
     cpu.regs[2] = cpu.regs[2] + -32;
     // sd ra, 0x18(sp)
@@ -136,7 +136,7 @@ L_0x1758:
     goto *(void *)cpu.regs[1];
 
 // --- Function: factorial ---
-L_0x1790:
+L_0x17a8:
     // addi sp, sp, -0x30
     cpu.regs[2] = cpu.regs[2] + -48;
     // sd ra, 0x28(sp)
@@ -154,42 +154,42 @@ L_0x1790:
     // lw a0, -0x18(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
     // beqz a0, 0x18
-    if (cpu.regs[10] == cpu.regs[0]) goto L_0x17c8;
+    if (cpu.regs[10] == cpu.regs[0]) goto L_0x17e0;
     // j 4
-    goto L_0x17b8;
-L_0x17b8:
+    goto L_0x17d0;
+L_0x17d0:
     // lw a0, -0x18(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
     // addi a1, zero, 1
     cpu.regs[11] = cpu.regs[0] + 1;
     // bne a0, a1, 0x14
-    if (cpu.regs[10] != cpu.regs[11]) goto L_0x17d4;
+    if (cpu.regs[10] != cpu.regs[11]) goto L_0x17ec;
     // j 4
-    goto L_0x17c8;
-L_0x17c8:
+    goto L_0x17e0;
+L_0x17e0:
     // addi a0, zero, 1
     cpu.regs[10] = cpu.regs[0] + 1;
     // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
     // j 0x50
-    goto L_0x1820;
-L_0x17d4:
+    goto L_0x1838;
+L_0x17ec:
     // addi a0, zero, 2
     cpu.regs[10] = cpu.regs[0] + 2;
     // sw a0, -0x24(s0)
     *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
     // j 4
-    goto L_0x17e0;
-L_0x17e0:
+    goto L_0x17f8;
+L_0x17f8:
     // lw a1, -0x24(s0)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
     // lw a0, -0x18(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
     // bltu a0, a1, 0x2c
-    if ((uint64_t)cpu.regs[10] < (uint64_t)cpu.regs[11]) goto L_0x1814;
+    if ((uint64_t)cpu.regs[10] < (uint64_t)cpu.regs[11]) goto L_0x182c;
     // j 4
-    goto L_0x17f0;
-L_0x17f0:
+    goto L_0x1808;
+L_0x1808:
     // lwu a1, -0x24(s0)
     cpu.regs[11] = (int64_t)*(uint32_t*)(memory + cpu.regs[8] + -36);
     // ld a0, -0x20(s0)
@@ -199,8 +199,8 @@ L_0x17f0:
     // sd a0, -0x20(s0)
     *(int64_t*)(memory + cpu.regs[8] + -32) = cpu.regs[10];
     // j 4
-    goto L_0x1804;
-L_0x1804:
+    goto L_0x181c;
+L_0x181c:
     // lw a0, -0x24(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
     // addiw a0, a0, 1
@@ -208,15 +208,15 @@ L_0x1804:
     // sw a0, -0x24(s0)
     *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
     // j -0x30
-    goto L_0x17e0;
-L_0x1814:
+    goto L_0x17f8;
+L_0x182c:
     // ld a0, -0x20(s0)
     cpu.regs[10] = *(int64_t*)(memory + cpu.regs[8] + -32);
     // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
     // j 4
-    goto L_0x1820;
-L_0x1820:
+    goto L_0x1838;
+L_0x1838:
     // lw a0, -0x14(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -20);
     // addi sp, s0, -0x30
@@ -231,7 +231,7 @@ L_0x1820:
     goto *(void *)cpu.regs[1];
 
 // --- Function: main ---
-L_0x1838:
+L_0x1850:
     // addi sp, sp, -0x30
     cpu.regs[2] = cpu.regs[2] + -48;
     // sd ra, 0x28(sp)
@@ -245,18 +245,18 @@ L_0x1838:
     // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
     // auipc a0, 0xfffff
-    cpu.regs[10] = 0x1850ULL + -4096LL;
-    // addi a0, a0, -0x2b4
-    cpu.regs[10] = cpu.regs[10] + -692;
+    cpu.regs[10] = 0x1868ULL + -4096LL;
+    // addi a0, a0, -0x2b9
+    cpu.regs[10] = cpu.regs[10] + -697;
 //--CALL TO FUNCTION NAMED: printf@plt ------------------
-        //Library Call to printf
+        // Library Call to printf (Interposed)
         {
             char* fmt = (char*)(memory + cpu.regs[10]);
-            printf("%s", fmt);
+            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], cpu.regs[14]);
             fflush(stdout);
-            cpu.regs[10] = 0;
+            cpu.regs[10] = 0; 
         }
-L_0x1860:
+L_0x1878:
     // addi a0, zero, 1
     cpu.regs[10] = cpu.regs[0] + 1;
     // sw a0, -0x18(s0)
@@ -268,27 +268,42 @@ L_0x1860:
     // lw a0, -0x18(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
     // auipc a1, 2
-    cpu.regs[11] = 0x1874ULL + 8192LL;
-    // addi a1, a1, 0x284
-    cpu.regs[11] = cpu.regs[11] + 644;
+    cpu.regs[11] = 0x188cULL + 8192LL;
+    // addi a1, a1, 0x28c
+    cpu.regs[11] = cpu.regs[11] + 652;
     // lw a1, 0(a1)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[11] + 0);
 //--CALL TO FUNCTION NAMED: addemup ------------------
     //AUIPC + JALR -> Static Goto
-    cpu.regs[1] = (int64_t)&&L_0x1888;
-    goto L_0x1758;
-L_0x1888:
+    cpu.regs[1] = (int64_t)&&L_0x18a0;
+    goto L_0x1770;
+L_0x18a0:
     // sw a0, -0x20(s0)
     *(int32_t*)(memory + cpu.regs[8] + -32) = (int32_t)(cpu.regs[10]);
     // lw a0, -0x20(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -32);
 //--CALL TO FUNCTION NAMED: factorial ------------------
     //AUIPC + JALR -> Static Goto
-    cpu.regs[1] = (int64_t)&&L_0x1898;
-    goto L_0x1790;
-L_0x1898:
+    cpu.regs[1] = (int64_t)&&L_0x18b0;
+    goto L_0x17a8;
+L_0x18b0:
     // sw a0, -0x24(s0)
     *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
+    // lw a1, -0x24(s0)
+    cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
+    // auipc a0, 0xfffff
+    cpu.regs[10] = 0x18b8ULL + -4096LL;
+    // addi a0, a0, -0x31c
+    cpu.regs[10] = cpu.regs[10] + -796;
+//--CALL TO FUNCTION NAMED: printf@plt ------------------
+        // Library Call to printf (Interposed)
+        {
+            char* fmt = (char*)(memory + cpu.regs[10]);
+            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], cpu.regs[14]);
+            fflush(stdout);
+            cpu.regs[10] = 0; 
+        }
+L_0x18c8:
     // lw a0, -0x24(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
     // addi sp, s0, -0x30
