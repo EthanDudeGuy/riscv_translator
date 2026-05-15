@@ -97,12 +97,19 @@ int64_t run_cpu() {
     cpu.regs[2] = 0x7FFFFFF0;
     cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;
     goto L_0x1850;
+//----------IN UNTRUSTED SPACE----------
 // Skipping compiler-generated function: _start (42 bytes)
+//----------IN UNTRUSTED SPACE----------
 // Skipping compiler-generated function: load_gp (12 bytes)
+//----------IN UNTRUSTED SPACE----------
 // Skipping compiler-generated function: $x (34 bytes)
+//----------IN UNTRUSTED SPACE----------
 // Skipping compiler-generated function: register_tm_clones (44 bytes)
+//----------IN UNTRUSTED SPACE----------
 // Skipping compiler-generated function: __do_global_dtors_aux (62 bytes)
+//----------IN UNTRUSTED SPACE----------
 // Skipping compiler-generated function: frame_dummy (10 bytes)
+//----------IN UNTRUSTED SPACE----------
 
 // --- Function: addemup ---
 L_0x1770:
@@ -134,6 +141,7 @@ L_0x1770:
     cpu.regs[2] = cpu.regs[2] + 32;
     // ret 
     goto *(void *)cpu.regs[1];
+//----------IN UNTRUSTED SPACE----------
 
 // --- Function: factorial ---
 L_0x17a8:
@@ -229,25 +237,34 @@ L_0x1838:
     cpu.regs[2] = cpu.regs[2] + 48;
     // ret 
     goto *(void *)cpu.regs[1];
+//----------IN TRUSTED SPACE----------
 
 // --- Function: main ---
 L_0x1850:
     // addi sp, sp, -0x30
     cpu.regs[2] = cpu.regs[2] + -48;
+//----------TRUSTED INSTRUCTION----------
     // sd ra, 0x28(sp)
     *(int64_t*)(memory + cpu.regs[2] + 40) = cpu.regs[1];
+//----------TRUSTED INSTRUCTION----------
     // sd s0, 0x20(sp)
     *(int64_t*)(memory + cpu.regs[2] + 32) = cpu.regs[8];
+//----------TRUSTED INSTRUCTION----------
     // addi s0, sp, 0x30
     cpu.regs[8] = cpu.regs[2] + 48;
+//----------TRUSTED INSTRUCTION----------
     // mv a0, zero
     cpu.regs[10] = cpu.regs[0] + 0;
+//----------TRUSTED INSTRUCTION----------
     // sw a0, -0x14(s0)
     *(int32_t*)(memory + cpu.regs[8] + -20) = (int32_t)(cpu.regs[10]);
+//----------TRUSTED INSTRUCTION----------
     // auipc a0, 0xfffff
     cpu.regs[10] = 0x1868ULL + -4096LL;
+//----------TRUSTED INSTRUCTION----------
     // addi a0, a0, -0x2b9
     cpu.regs[10] = cpu.regs[10] + -697;
+//----------TRUSTED INSTRUCTION----------
 //--CALL TO FUNCTION NAMED: printf@plt ------------------
         // Library Call to printf (Interposed)
         {
@@ -259,20 +276,28 @@ L_0x1850:
 L_0x1878:
     // addi a0, zero, 1
     cpu.regs[10] = cpu.regs[0] + 1;
+//----------TRUSTED INSTRUCTION----------
     // sw a0, -0x18(s0)
     *(int32_t*)(memory + cpu.regs[8] + -24) = (int32_t)(cpu.regs[10]);
+//----------TRUSTED INSTRUCTION----------
     // addi a0, zero, 2
     cpu.regs[10] = cpu.regs[0] + 2;
+//----------TRUSTED INSTRUCTION----------
     // sw a0, -0x1c(s0)
     *(int32_t*)(memory + cpu.regs[8] + -28) = (int32_t)(cpu.regs[10]);
+//----------TRUSTED INSTRUCTION----------
     // lw a0, -0x18(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -24);
+//----------TRUSTED INSTRUCTION----------
     // auipc a1, 2
     cpu.regs[11] = 0x188cULL + 8192LL;
+//----------TRUSTED INSTRUCTION----------
     // addi a1, a1, 0x28c
     cpu.regs[11] = cpu.regs[11] + 652;
+//----------TRUSTED INSTRUCTION----------
     // lw a1, 0(a1)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[11] + 0);
+//----------TRUSTED INSTRUCTION----------
 //--CALL TO FUNCTION NAMED: addemup ------------------
     //AUIPC + JALR -> Static Goto
     cpu.regs[1] = (int64_t)&&L_0x18a0;
@@ -280,8 +305,10 @@ L_0x1878:
 L_0x18a0:
     // sw a0, -0x20(s0)
     *(int32_t*)(memory + cpu.regs[8] + -32) = (int32_t)(cpu.regs[10]);
+//----------TRUSTED INSTRUCTION----------
     // lw a0, -0x20(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -32);
+//----------TRUSTED INSTRUCTION----------
 //--CALL TO FUNCTION NAMED: factorial ------------------
     //AUIPC + JALR -> Static Goto
     cpu.regs[1] = (int64_t)&&L_0x18b0;
@@ -289,12 +316,16 @@ L_0x18a0:
 L_0x18b0:
     // sw a0, -0x24(s0)
     *(int32_t*)(memory + cpu.regs[8] + -36) = (int32_t)(cpu.regs[10]);
+//----------TRUSTED INSTRUCTION----------
     // lw a1, -0x24(s0)
     cpu.regs[11] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
+//----------TRUSTED INSTRUCTION----------
     // auipc a0, 0xfffff
     cpu.regs[10] = 0x18b8ULL + -4096LL;
+//----------TRUSTED INSTRUCTION----------
     // addi a0, a0, -0x31c
     cpu.regs[10] = cpu.regs[10] + -796;
+//----------TRUSTED INSTRUCTION----------
 //--CALL TO FUNCTION NAMED: printf@plt ------------------
         // Library Call to printf (Interposed)
         {
@@ -306,16 +337,22 @@ L_0x18b0:
 L_0x18c8:
     // lw a0, -0x24(s0)
     cpu.regs[10] = (int64_t)*(int32_t*)(memory + cpu.regs[8] + -36);
+//----------TRUSTED INSTRUCTION----------
     // addi sp, s0, -0x30
     cpu.regs[2] = cpu.regs[8] + -48;
+//----------TRUSTED INSTRUCTION----------
     // ld ra, 0x28(sp)
     cpu.regs[1] = *(int64_t*)(memory + cpu.regs[2] + 40);
+//----------TRUSTED INSTRUCTION----------
     // ld s0, 0x20(sp)
     cpu.regs[8] = *(int64_t*)(memory + cpu.regs[2] + 32);
+//----------TRUSTED INSTRUCTION----------
     // addi sp, sp, 0x30
     cpu.regs[2] = cpu.regs[2] + 48;
+//----------TRUSTED INSTRUCTION----------
     // ret 
     goto *(void *)cpu.regs[1];
+//----------TRUSTED INSTRUCTION----------
 
 L_RETFROMMAIN:
     return cpu.regs[10];

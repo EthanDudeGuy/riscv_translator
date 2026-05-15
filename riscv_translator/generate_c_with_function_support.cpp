@@ -17,6 +17,11 @@ struct SymbolInfo {
 	uint64_t size;
 };
 
+//tag to tell run_cpu function if we are sending to sentry
+bool trusted = true;
+
+
+
 //print the C header for the stuff we need to run
 void print_header() {
 	//libraries needed by default
@@ -612,6 +617,13 @@ void printf_to_c() {
     printf("        }\n");
 }
 
+void send_to_sentry(uint64_t result_to_send) {
+	//put socket code and rotating buffer here
+	//TODO: implement rotating buffer
+	//pass IP of socket to this routine somehow (hardcode for testing maybe)
+	//figure out what format to send results in and how many to send in a batch
+}
+
 
 //print the function that acts as the functional eq of the text section
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, SymbolInfo>& symbols) {
@@ -628,6 +640,15 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 		if (symbols.count(address)) {
 			SymbolInfo info = symbols[address];
 			
+			//set the mode and then send if 
+			if (info.name.rfind("TGTrusted.", 0) == 0 || info.name == "main") {
+				trusted = true;
+				printf("//----------IN TRUSTED SPACE----------\n");
+			} else {
+				trusted = false;
+				printf("//----------IN UNTRUSTED SPACE----------\n");
+			}	
+
 			if (info.name == "_start" || info.name == "deregister_tm_clones" || 
 			    info.name == "register_tm_clones" || info.name == "__do_global_dtors_aux" || 
 			    info.name == "frame_dummy" || info.name == "load_gp"  || info.name == "$x") {
@@ -724,6 +745,11 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 
         	// If we didn't encounter a auipc + jalr pair
         	translate_to_c(handle, insn, targets, main_addr);
+		//PLACE ADITIONAL INSTRUMENTATION HERE (EVERY INSTRUCTION EXECUTES BESIDES FUNCTION CALL JUMPS)
+		//TODO:addition instrumentation
+		if (trusted) {
+			printf("//----------TRUSTED INSTRUCTION----------\n");
+		}
 	}
 	
 	//label pointer to this label will be pushed onto stack
