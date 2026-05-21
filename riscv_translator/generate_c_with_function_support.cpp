@@ -64,14 +64,35 @@ void print_header() {
     	printf("    unsigned int control;  // Bitflags: [WasBranchTaken | IsLoad | IsStore | IsBranch]\n");
 	printf("};\n");
 
-	//define send_to_sentry
-	
+
+	//buffer for holding results before sending
+	//and global to track how full it is
+	printf("#define BUFFER_SIZE 64\n");
+	printf("struct ExecInfo buffer[BUFFER_SIZE];\n");
+	printf("int itemsInBuffer = 0;\n");
+	printf("static FILE* sentry_log_file = NULL;\n");
+
+	printf("\n");
+
+	printf("void flush_to_disk() {\n");
+	printf("    if (sentry_log_file == NULL) {\n");
+	printf("        sentry_log_file = fopen(\"sentry_trace.log\", \"ab\"); // Open in binary append mode\n");
+	printf("    }\n");
+	printf("    if (sentry_log_file != NULL) {\n");
+	printf("        fwrite(buffer, sizeof(struct ExecInfo), itemsInBuffer, sentry_log_file);\n");
+	printf("        fflush(sentry_log_file);\n");
+	printf("    }\n");
+	printf("    itemsInBuffer = 0; // Reset counter after flush\n");
+	printf("}\n\n");
+
 	printf("void send_to_sentry(struct ExecInfo toSend) {\n");
-	printf("    //put socket code and rotating buffer here\n");
-	printf("    //TODO: implement rotating buffer\n");
-	printf("    //pass IP of socket to this routine somehow (hardcode for testing maybe)\n");
-	printf("    //figure out what format to send results in and how many to send in a batch\n");
-	printf("}\n");
+	printf("    buffer[itemsInBuffer] = toSend;\n");
+	printf("    itemsInBuffer++;\n\n");
+	printf("    // If buffer is full, trigger a flush\n");
+	printf("    if (itemsInBuffer >= BUFFER_SIZE) {\n");
+	printf("        flush_to_disk();\n");
+	printf("    }\n");
+	printf("}\n\n");
 
 	printf("\n");
 }
