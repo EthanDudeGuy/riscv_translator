@@ -67,24 +67,24 @@ void print_header() {
 
 	//buffer for holding results before sending
 	//and global to track how full it is
-	printf("#define BUFFER_SIZE 64\n");
+	printf("#define BUFFER_SIZE 2452\n");
 	printf("struct ExecInfo buffer[BUFFER_SIZE];\n");
 	printf("int itemsInBuffer = 0;\n");
 	printf("static FILE* sentry_log_file = NULL;\n");
 
 	printf("\n");
-
+	//temp writing to dev null to observe file IO overhead
 	printf("void flush_to_disk() {\n");
 	printf("    if (sentry_log_file == NULL) {\n");
-	printf("        sentry_log_file = fopen(\"sentry_trace.log\", \"ab\"); // Open in binary append mode\n");
+	printf("        //sentry_log_file = fopen(\"sentry_trace.log\", \"ab\"); // Open in binary append mode\n");
+	printf("        sentry_log_file = fopen(\"/dev/null\", \"ab\"); // Open in binary append mode\n");
 	printf("    }\n");
 	printf("    if (sentry_log_file != NULL) {\n");
 	printf("        fwrite(buffer, sizeof(struct ExecInfo), itemsInBuffer, sentry_log_file);\n");
-	printf("        fflush(sentry_log_file);\n");
 	printf("    }\n");
 	printf("    itemsInBuffer = 0; // Reset counter after flush\n");
 	printf("}\n\n");
-
+	//nutered for testing
 	printf("void send_to_sentry(struct ExecInfo toSend) {\n");
 	printf("    buffer[itemsInBuffer] = toSend;\n");
 	printf("    itemsInBuffer++;\n\n");
@@ -568,7 +568,63 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
-                //branch less than unsigned
+
+		//branch greater than or equal to unsigned
+                case RISCV_INS_BGEU: {
+                        int rs1 = reg_to_index(riscv->operands[0].reg);
+                        int rs2 = 0;
+                        uint64_t target = get_branch_target(insn);
+
+                        //bnez will have the same enum but only two operands for the register and target imm
+                        if (riscv->op_count == 3) {
+                                rs2 = reg_to_index(riscv->operands[1].reg);
+                        } else if (riscv->op_count == 2) {
+                                rs2 = 0;
+                        } else {
+                                std::cerr << "invalid opcount for branch equal instr" << std::endl;
+                        }
+			if (trusted) {
+				printf("    {\n");
+				printf("        int taken = ((uint64_t)cpu.regs[%d] >= (uint64_t)cpu.regs[%d]);\n", rs1, rs2);	
+				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
+				printf("        send_to_sentry(toSend);\n");
+				printf("        if (taken) goto L_0x%lx;\n", target);
+				printf("    }\n");
+			} else {
+				printf("    if ((uint64_t)cpu.regs[%d] >= (uint64_t)cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
+			}
+                        break;
+                }
+
+
+		//branch greater than or equal to
+                case RISCV_INS_BGE: {
+                        int rs1 = reg_to_index(riscv->operands[0].reg);
+                        int rs2 = 0;
+                        uint64_t target = get_branch_target(insn);
+
+                        //bnez will have the same enum but only two operands for the register and target imm
+                        if (riscv->op_count == 3) {
+                                rs2 = reg_to_index(riscv->operands[1].reg);
+                        } else if (riscv->op_count == 2) {
+                                rs2 = 0;
+                        } else {
+                                std::cerr << "invalid opcount for branch equal instr" << std::endl;
+                        }
+			if (trusted) {
+				printf("    {\n");
+				printf("        int taken = (cpu.regs[%d] >= cpu.regs[%d]);\n", rs1, rs2);	
+				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
+				printf("        send_to_sentry(toSend);\n");
+				printf("        if (taken) goto L_0x%lx;\n", target);
+				printf("    }\n");
+			} else {
+				printf("    if (cpu.regs[%d] >= cpu.regs[%d]) goto L_0x%lx;\n", rs1, rs2, target);
+			}
+                        break;
+                }
+
+		//branch less than unsigned
                 case RISCV_INS_BLTU: {
                         int rs1 = reg_to_index(riscv->operands[0].reg);
                         int rs2 = reg_to_index(riscv->operands[1].reg);
@@ -753,6 +809,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			uint64_t pc = insn->address;
 
 			if (rd != 0) {
+				printf("    cpu.regs[%d] = 0x%lxULL + %ldLL;\n", rd, pc, imm);
 				// rd = current_pc + immediate
 				if (trusted) {
 					printf("    {\n");
@@ -760,7 +817,6 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 					printf("        send_to_sentry(toSend);\n");
 					printf("    }\n");
 				}
-				printf("    cpu.regs[%d] = 0x%lxULL + %ldLL;\n", rd, pc, imm);
 			}
 			break;
 		}
@@ -795,28 +851,29 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 //used to determine if we are replacing
 bool is_replaceable_function(std::string func_name) {
 	printf("//--CALL TO FUNCTION NAMED: %s ------------------\n", func_name.c_str());
+	return  (func_name == "printf@plt" || func_name == "puts@plt");
+}
+
+void replace_function(std::string func_name) {
 	if (func_name == "printf@plt") {
-		return true;
-	} else {
-		return false;
-	}	
+
+		printf("        // Library Call to printf (Interposed)\n");
+		printf("        {\n");
+		printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
+		printf("            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], cpu.regs[14]);\n");
+		printf("            cpu.regs[10] = 0; \n");
+		printf("        }\n");
+	} else if (func_name == "puts@plt") {
+
+		printf("        // Library Call to puts (Interposed)\n");
+		printf("        {\n");
+		printf("            char* str = (char*)(memory + cpu.regs[10]);\n");
+		printf("            int ret = puts(str);\n");
+		printf("            cpu.regs[10] = ret;\n");
+		printf("        }\n");
+	}
 
 }
-
-void printf_to_c() {
-    printf("        // Library Call to printf (Interposed)\n");
-    printf("        {\n");
-    // a0 (regs[10]) is the format string
-    printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
-    // a1-a5 (regs[11-14]) are the potential arguments
-    printf("            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], cpu.regs[14]);\n");
-    printf("            fflush(stdout);\n");
-    printf("            cpu.regs[10] = 0; \n");
-    printf("        }\n");
-}
-
-
-
 
 //print the function that acts as the functional eq of the text section
 void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64_t address, cs_insn *insn, uint64_t main_addr, std::set<uint64_t>& targets, std::map<uint64_t, SymbolInfo>& symbols) {
@@ -834,7 +891,7 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 			SymbolInfo info = symbols[address];
 			
 			//set the mode and then send if 
-			if (info.name.rfind("TGTrusted.", 0) == 0 || info.name == "main") {
+			if (info.name.rfind("TGtrusted_", 0) == 0 || info.name == "main") {
 				trusted = true;
 				printf("//----------IN TRUSTED SPACE----------\n");
 			} else {
@@ -915,7 +972,11 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 						//symbol exists and is one of our replaceable functions
 						//TODO: make call to general function that contains all possible replacable functions
 						//and replaces with appropriate call
-						printf_to_c();
+						
+						
+						replace_function(find_iterator->second.name.c_str());
+
+		
 						//this will become a generic function for replacing target lib functions	
 					} else {
 						//doesn't exist, do regular logic, function in in translated C land
