@@ -206,8 +206,8 @@ void print_main() {
 
 	printf("    int64_t retval = 0;\n");
 	printf("    init_memory(argv[1]);\n");
-	printf("    //sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
-	printf("    sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
+	printf("    sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
+	printf("    //sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
 
 	printf("    retval = run_cpu();\n");
 	printf("    return retval;\n");
@@ -914,21 +914,14 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 	printf("    cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;\n");
 	printf("    goto L_0x%lx;\n", main_addr);
 
-
 	while (code_size > 0) {
 		//skip compiler generated bookkeeping functions, we handle setup ourselves and will not
 		//actually be linking to the stdlib the binary thinks		
 		if (symbols.count(address)) {
 			SymbolInfo info = symbols[address];
 			
-			//set the mode and then send if 
-			if (info.name.rfind("TGtrusted_", 0) == 0 || info.name == "main") {
-				trusted = true;
-				printf("//----------IN TRUSTED SPACE----------\n");
-			} else {
-				trusted = false;
-				printf("//----------IN UNTRUSTED SPACE----------\n");
-			}	
+			//set the mode
+			trusted = (info.name.rfind("TGtrusted_", 0) == 0 || info.name == "main");
 
 			if (info.name == "_start" || info.name == "deregister_tm_clones" || 
 			    info.name == "register_tm_clones" || info.name == "__do_global_dtors_aux" || 
@@ -1037,15 +1030,15 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 		
 			cs_free(next_insn, 1);
         	}
-
+		//check buffer fill level and dump to sentry (maybe)
+		printf("    maybe_flush_buffer();\n");
         	// If we didn't encounter a auipc + jalr pair
         	translate_to_c(handle, insn, targets, main_addr);
 		//PLACE ADITIONAL INSTRUMENTATION HERE (EVERY INSTRUCTION EXECUTES BESIDES FUNCTION CALL JUMPS)
 		//TODO:addition instrumentation
 		if (trusted) {
-			printf("//----------TRUSTED INSTRUCTION----------\n");
+			printf("//^^^^^^^^^^TRUSTED INSTRUCTION^^^^^^^^^^\n");
 		}
-		printf("    maybe_flush_buffer();\n");
 	}
 	
 	//label pointer to this label will be pushed onto stack
