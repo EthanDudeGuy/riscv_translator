@@ -53,46 +53,97 @@ void print_header() {
 	printf("\n");
 
 	//define struct needed to pack values to send to sentry
-	printf("#define	IS_BRANCH (1 << 0)\n");
-	printf("#define JUMP_TAKEN (1 << 1)\n");
-	printf("#define IS_LOAD   (1 << 2)\n");
-	printf("#define IS_STORE  (1 << 3)\n");
+	//printf("#define	IS_BRANCH (1 << 0)\n");
+	//printf("#define JUMP_TAKEN (1 << 1)\n");
+	//printf("#define IS_LOAD   (1 << 2)\n");
+	//printf("#define IS_STORE  (1 << 3)\n");
 
-	printf("struct ExecInfo {\n");
-    	printf("    uint64_t result_value; // The value written to RD or memory\n");
-    	printf("    uint64_t target_pc;    // Used if the instruction was an indirect jump\n");
-    	printf("    unsigned int control;  // Bitflags: [WasBranchTaken | IsLoad | IsStore | IsBranch]\n");
-	printf("};\n");
+	//printf("struct ExecInfo {\n");
+    	//printf("    uint64_t result_value; // The value written to RD or memory\n");
+    	//printf("    uint64_t target_pc;    // Used if the instruction was an indirect jump\n");
+    	//printf("    unsigned int control;  // Bitflags: [WasBranchTaken | IsLoad | IsStore | IsBranch]\n");
+	//printf("};\n");
 
 
 	//buffer for holding results before sending
 	//and global to track how full it is
-	printf("#define BUFFER_SIZE 2452\n");
-	printf("struct ExecInfo buffer[BUFFER_SIZE];\n");
-	printf("int itemsInBuffer = 0;\n");
+	printf("#define BUFFER_SIZE (1 << 26)\n"); //64 MB
+	//printf("#define BUFFER_SIZE 2048\n"); //64 MB
+	printf("#define BUFFER_FLUSH_MARGIN 64\n");
+	printf("uint8_t buffer[BUFFER_SIZE];\n");
+	printf("int bufferPos = 0;\n");
 	printf("static FILE* sentry_log_file = NULL;\n");
 
-	printf("\n");
-	//temp writing to dev null to observe file IO overhead
-	printf("void flush_to_disk() {\n");
-	printf("    if (sentry_log_file == NULL) {\n");
-	printf("        //sentry_log_file = fopen(\"sentry_trace.log\", \"ab\"); // Open in binary append mode\n");
-	printf("        sentry_log_file = fopen(\"/dev/null\", \"ab\"); // Open in binary append mode\n");
-	printf("    }\n");
-	printf("    if (sentry_log_file != NULL) {\n");
-	printf("        fwrite(buffer, sizeof(struct ExecInfo), itemsInBuffer, sentry_log_file);\n");
-	printf("    }\n");
-	printf("    itemsInBuffer = 0; // Reset counter after flush\n");
+	printf("enum {\n");
+	printf("    TAG_VAL = 0x00,\n");
+	printf("    TAG_BRANCH_NOT_TAKEN = 0x01,\n");
+	printf("    TAG_BRANCH_TAKEN = 0x02,\n");
+	printf("    TAG_MEM = 0x03,\n");
+	printf("};\n\n");
+	
+	printf("static inline __attribute__((always_inline))\n");
+	printf("void emit_u8(uint8_t x) {\n");
+	printf("    buffer[bufferPos++] = x;\n");
 	printf("}\n\n");
+
+	printf("static inline __attribute__((always_inline))\n");
+	printf("void emit_u64(uint64_t x) {\n");
+	printf("    __builtin_memcpy(&buffer[bufferPos], &x, 8);\n");
+	printf("    bufferPos += 8;\n");
+	printf("}\n\n");
+
+	printf("static inline __attribute__((always_inline))\n");
+	printf("void trace_val(uint64_t value) {\n");
+	printf("    emit_u64(value);\n");
+	printf("}\n\n");
+
+	printf("static inline __attribute__((always_inline))\n");
+	printf("void trace_branch_not_taken(void) {\n");
+	printf("    emit_u8(TAG_BRANCH_NOT_TAKEN);\n");
+	printf("}\n\n");
+
+	printf("static inline __attribute__((always_inline))\n");
+	printf("void trace_branch_taken(uint64_t target) {\n");
+	printf("    emit_u8(TAG_BRANCH_TAKEN);\n");
+	printf("    emit_u64(target);\n");
+	printf("}\n\n");
+
+	printf("static inline __attribute__((always_inline))\n");
+	printf("void trace_mem(uint64_t addr, uint64_t value) {\n");
+	printf("    emit_u8(TAG_MEM);\n");
+	printf("    emit_u64(addr);\n");
+	printf("    emit_u64(value);\n");
+	printf("}\n\n");	
+
+	//tell compiler to expect not to flush 
+	printf("void maybe_flush_buffer() {\n");
+	printf("    if (__builtin_expect(bufferPos > BUFFER_SIZE - BUFFER_FLUSH_MARGIN, 0)) {\n");
+	printf("        fwrite(buffer, sizeof(uint8_t), bufferPos, sentry_log_file);\n");
+	printf("        bufferPos = 0; // Reset counter after flush\n");
+	printf("    }\n");
+	printf("}\n\n");
+
+	printf("void flush_buffer_final() {\n");
+	printf("    if (bufferPos > 0) {\n");
+	printf("        fwrite(buffer, sizeof(uint8_t), bufferPos, sentry_log_file);\n");
+	printf("        bufferPos = 0; // Reset counter after flush\n");
+	printf("    }\n");
+	printf("}\n\n");
+
 	//nutered for testing
-	printf("void send_to_sentry(struct ExecInfo toSend) {\n");
-	printf("    buffer[itemsInBuffer] = toSend;\n");
-	printf("    itemsInBuffer++;\n\n");
-	printf("    // If buffer is full, trigger a flush\n");
-	printf("    if (itemsInBuffer >= BUFFER_SIZE) {\n");
-	printf("        flush_to_disk();\n");
-	printf("    }\n");
-	printf("}\n\n");
+	//inlining this function call does not seem to reduce overhead by any amount??	
+	//printf("static inline __attribute__((always_inline))\n");
+	//printf("void send_to_sentry(struct ExecInfo toSend) {\n");
+	//printf("    buffer[itemsInBuffer++] = toSend;\n\n");
+	//printf("    // If buffer is full, trigger a flush\n");
+	//printf("    if (itemsInBuffer >= BUFFER_SIZE) {\n");
+	//printf("        flush_to_disk();\n");
+	//printf("    }\n");
+	//printf("}\n\n");
+
+
+
+
 
 	printf("\n");
 }
@@ -155,6 +206,8 @@ void print_main() {
 
 	printf("    int64_t retval = 0;\n");
 	printf("    init_memory(argv[1]);\n");
+	printf("    //sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
+	printf("    sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
 
 	printf("    retval = run_cpu();\n");
 	printf("    return retval;\n");
@@ -390,8 +443,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] + %ld;\n", rd, rs1, imm);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -407,8 +459,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = (int64_t)(int32_t)(cpu.regs[%d] + %ld);\n", rd, rs1, imm);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -423,8 +474,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] + cpu.regs[%d];\n", rd, rs1, rs2);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -440,8 +490,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = (int64_t)(int32_t)(cpu.regs[%d] + cpu.regs[%d]);\n", rd, rs1, rs2);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -456,8 +505,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] - cpu.regs[%d];\n", rd, rs1, rs2);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -473,8 +521,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = (int64_t)(int32_t)(cpu.regs[%d] - cpu.regs[%d]);\n", rd, rs1, rs2);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -489,8 +536,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = cpu.regs[%d] * cpu.regs[%d];\n", rd, rs1, rs2);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -504,8 +550,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         if (rd != 0) printf("    cpu.regs[%d] = (uint64_t)(uint32_t)(cpu.regs[%d] * cpu.regs[%d]);\n", rd, rs1, rs2);
 			if (trusted) {
 				printf("    {\n");
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_val(cpu.regs[%d]);\n", rd);
 				printf("    }\n");
 			}
                         break;
@@ -530,8 +575,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (trusted) {
 				printf("    {\n");
 				printf("        int taken = (cpu.regs[%d] == cpu.regs[%d]);\n", rs1, rs2);	
-				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
-				printf("        send_to_sentry(toSend);\n");
+				printf("        taken ? trace_branch_taken(0x%lx) : trace_branch_not_taken();\n", target);
 				printf("        if (taken) goto L_0x%lx;\n", target);
 				printf("    }\n");
 			} else {
@@ -558,8 +602,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (trusted) {
 				printf("    {\n");
 				printf("        int taken = (cpu.regs[%d] != cpu.regs[%d]);\n", rs1, rs2);	
-				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
-				printf("        send_to_sentry(toSend);\n");
+				printf("        taken ? trace_branch_taken(0x%lx) : trace_branch_not_taken();\n", target);
 				printf("        if (taken) goto L_0x%lx;\n", target);
 				printf("    }\n");
 			} else {
@@ -586,8 +629,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (trusted) {
 				printf("    {\n");
 				printf("        int taken = ((uint64_t)cpu.regs[%d] >= (uint64_t)cpu.regs[%d]);\n", rs1, rs2);	
-				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
-				printf("        send_to_sentry(toSend);\n");
+				printf("        taken ? trace_branch_taken(0x%lx) : trace_branch_not_taken();\n", target);
 				printf("        if (taken) goto L_0x%lx;\n", target);
 				printf("    }\n");
 			} else {
@@ -614,8 +656,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (trusted) {
 				printf("    {\n");
 				printf("        int taken = (cpu.regs[%d] >= cpu.regs[%d]);\n", rs1, rs2);	
-				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
-				printf("        send_to_sentry(toSend);\n");
+				printf("        taken ? trace_branch_taken(0x%lx) : trace_branch_not_taken();\n", target);
 				printf("        if (taken) goto L_0x%lx;\n", target);
 				printf("    }\n");
 			} else {
@@ -632,8 +673,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (trusted) {
 				printf("    {\n");
 				printf("        int taken = ((uint64_t)cpu.regs[%d] < (uint64_t)cpu.regs[%d]);\n", rs1, rs2);	
-				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
-				printf("        send_to_sentry(toSend);\n");
+				printf("        taken ? trace_branch_taken(0x%lx) : trace_branch_not_taken();\n", target);
 				printf("        if (taken) goto L_0x%lx;\n", target);
 				printf("    }\n");
 			} else {
@@ -650,8 +690,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (trusted) {
 				printf("    {\n");
 				printf("        int taken = (cpu.regs[%d] < cpu.regs[%d]);\n", rs1, rs2);	
-				printf("        struct ExecInfo toSend = {0, 0, IS_BRANCH | (taken ? JUMP_TAKEN : 0)};\n");
-				printf("        send_to_sentry(toSend);\n");
+				printf("        taken ? trace_branch_taken(0x%lx) : trace_branch_not_taken();\n", target);
 				printf("        if (taken) goto L_0x%lx;\n", target);
 				printf("    }\n");
 			} else {
@@ -668,8 +707,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                                 uint64_t target = get_branch_target(insn);
 				if (trusted) {
 					printf("    {\n");
-					printf("        struct ExecInfo toSend = {0,0,JUMP_TAKEN};\n");
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_branch_taken(0x%lx);\n", target);
 					printf("    };\n");
 				}
                                 printf("    goto L_0x%lx;\n", target);
@@ -688,8 +726,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 				printf("    {\n");
 				printf("        uint64_t addr = cpu.regs[%d] + %ld;\n", base_reg, offset);
 				printf("        *(int64_t*)(memory + addr) = cpu.regs[%d];\n", rs2); //actual instr
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], addr, IS_STORE};\n", rs2);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_mem(addr, cpu.regs[%d]);\n", rs2);
 				printf("    }\n");
 			} else {
                         	printf("    *(int64_t*)(memory + cpu.regs[%d] + %ld) = cpu.regs[%d];\n", base_reg, offset, rs2);
@@ -708,8 +745,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 				printf("    {\n");
 				printf("        uint64_t addr = cpu.regs[%d] + %ld;\n", base_reg, offset);
 				printf("        *(int32_t*)(memory + addr) = (int32_t)cpu.regs[%d];\n", rs2); //actual instr
-				printf("        struct ExecInfo toSend = {cpu.regs[%d], addr, IS_STORE};\n", rs2);
-				printf("        send_to_sentry(toSend);\n");
+				printf("        trace_mem(addr, (uint64_t)(int32_t)cpu.regs[%d]);\n", rs2);
 				printf("    }\n");
 			} else {
                         	printf("    *(int32_t*)(memory + cpu.regs[%d] + %ld) = (int32_t)(cpu.regs[%d]);\n", base_reg, offset, rs2);
@@ -729,8 +765,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 					printf("    {\n");
 					printf("        uint64_t addr = cpu.regs[%d] + %ld;\n", base_reg, offset);
 					printf("        cpu.regs[%d] = *(int64_t*)(memory + addr);\n", rd); //actual instr
-					printf("        struct ExecInfo toSend = {cpu.regs[%d], addr, IS_LOAD};\n", rd);
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_mem(addr, cpu.regs[%d]);\n", rd);
 					printf("    }\n");
 				} else {
                         		printf("    cpu.regs[%d] = *(int64_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
@@ -751,8 +786,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 					printf("    {\n");
 					printf("        uint64_t addr = cpu.regs[%d] + %ld;\n", base_reg, offset);
 					printf("        cpu.regs[%d] = (int64_t)*(int32_t*)(memory + addr);\n", rd); //actual instr
-					printf("        struct ExecInfo toSend = {cpu.regs[%d], addr, IS_LOAD};\n", rd);
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_mem(addr, cpu.regs[%d]);\n", rd);
 					printf("    }\n");
 				} else {
                         		printf("    cpu.regs[%d] = (int64_t)*(int32_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
@@ -773,8 +807,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 					printf("    {\n");
 					printf("        uint64_t addr = cpu.regs[%d] + %ld;\n", base_reg, offset);
 					printf("        cpu.regs[%d] = (int64_t)*(uint32_t*)(memory + addr);\n", rd); //actual instr
-					printf("        struct ExecInfo toSend = {cpu.regs[%d], addr, IS_LOAD};\n", rd);
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_mem(addr, cpu.regs[%d]);\n", rd);
 					printf("    }\n");
 				} else {
                         		printf("    cpu.regs[%d] = (int64_t)*(uint32_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
@@ -792,8 +825,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 				if (trusted) {
 					printf("    {\n");
 					printf("        cpu.regs[%d] = (int64_t)(int32_t)(0x%lx << 12);\n", rd, imm); //actual instr
-					printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, IS_LOAD};\n", rd);
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_mem(addr, cpu.regs[%d]);\n", rd);
 					printf("    }\n");
 				} else {
                         		printf("    cpu.regs[%d] = (int64_t)(int32_t)(0x%lx << 12);\n", rd, imm);
@@ -813,8 +845,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 				// rd = current_pc + immediate
 				if (trusted) {
 					printf("    {\n");
-					printf("        struct ExecInfo toSend = {cpu.regs[%d], 0, 0};\n", rd);
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_val(cpu.regs[%d]);\n", rd);
 					printf("    }\n");
 				}
 			}
@@ -827,8 +858,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 				//ret instruction
 				if (trusted) {
 					printf("    {\n");
-					printf("        struct ExecInfo toSend = {0, cpu.regs[1], IS_BRANCH | JUMP_TAKEN};\n");
-					printf("        send_to_sentry(toSend);\n");
+					printf("        trace_branch_taken(cpu.regs[1]);\n");
 					printf("    }\n");
 				}
 				printf("    goto *(void *)cpu.regs[1];\n");
@@ -883,6 +913,7 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 	printf("    cpu.regs[2] = 0x7FFFFFF0;\n");
 	printf("    cpu.regs[1] = (int64_t)&&L_RETFROMMAIN;\n");
 	printf("    goto L_0x%lx;\n", main_addr);
+
 
 	while (code_size > 0) {
 		//skip compiler generated bookkeeping functions, we handle setup ourselves and will not
@@ -987,8 +1018,8 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 						//we need to send the target address for this one cuz its calculated at runtime
 						if (trusted) {
 							printf("    {\n");
-							printf("        struct ExecInfo toSend = {0, 0x%lx, IS_BRANCH | JUMP_TAKEN};\n", target);
-							printf("        send_to_sentry(toSend);\n");
+							printf("        trace_branch_taken(0x%lx);\n", target);
+							printf("        maybe_flush_buffer();\n");
 							printf("    }\n");
 						}
 						printf("    goto L_0x%lx;\n", target);
@@ -1014,11 +1045,13 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 		if (trusted) {
 			printf("//----------TRUSTED INSTRUCTION----------\n");
 		}
+		printf("    maybe_flush_buffer();\n");
 	}
 	
 	//label pointer to this label will be pushed onto stack
 	//at RIP before entering main, if we see it in a ret, jump here	
 	printf("\nL_RETFROMMAIN:\n");
+	printf("    flush_buffer_final();\n");
 	printf("    return cpu.regs[10];\n");
 	printf("}\n");
 }
