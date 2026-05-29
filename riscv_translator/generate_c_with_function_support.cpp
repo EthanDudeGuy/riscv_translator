@@ -206,8 +206,8 @@ void print_main() {
 
 	printf("    int64_t retval = 0;\n");
 	printf("    init_memory(argv[1]);\n");
-	printf("    sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
-	printf("    //sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
+	printf("    //sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
+	printf("    sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
 
 	printf("    retval = run_cpu();\n");
 	printf("    return retval;\n");
@@ -921,7 +921,7 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 			SymbolInfo info = symbols[address];
 			
 			//set the mode
-			trusted = (info.name.rfind("TGtrusted_", 0) == 0 || info.name == "main");
+			trusted = (info.name.rfind("TGtrusted.", 0) == 0 || info.name == "main");
 
 			if (info.name == "_start" || info.name == "deregister_tm_clones" || 
 			    info.name == "register_tm_clones" || info.name == "__do_global_dtors_aux" || 
