@@ -123,7 +123,6 @@ void print_header() {
 
 	//TODO: create a struct to send over the network with a flag for it 
 	//contains send or recieve or just a bunch of regular instructions
-	printf()
 
 	//nutered for testing
 	//inlining this function call does not seem to reduce overhead by any amount??	
