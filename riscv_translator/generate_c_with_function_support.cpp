@@ -79,7 +79,12 @@ void print_header() {
         printf("#include <sys/mman.h>\n");
         printf("#include <fcntl.h>\n");
         printf("#include <unistd.h>\n");
-        printf("#include <elf.h>\n\n");
+        printf("#include <elf.h>\n");
+	//sentry comms includes for network stuff
+	printf("#include <sys/socket.h>\n");
+	printf("#include <arpa/inet.h>\n");
+	printf("#include <errno.h>\n");
+	printf("#include <string.h>\n");
 
         printf("// Global RV64 State\n");
 	
@@ -108,21 +113,67 @@ void print_header() {
        	printf("#define NOTTAKEN 1\n");	
 	printf("uint64_t buffer[BUFFER_SIZE];\n");
 	printf("int bufferPos = 0;\n");
-	printf("static FILE* sentry_log_file = NULL;\n");
+	//for test writing to a log file
+	//printf("static FILE* sentry_log_file = NULL;\n");
+	//
+	//for actual network coms file descriptor (sentry control FD)
+	printf("static int scfd = -1;\n");
+	
+	//socket initi for sc living on 9090
+	printf("void init_sc_socket(void) {\n");
+	printf("    scfd = socket(AF_INET, SOCK_STREAM, 0);\n");
+	printf("    if (scfd < 0) {\n");
+	printf("        perror(\"socket failed\");\n");
+	printf("        exit(1);\n");
+	printf("    }\n\n");
+
+	printf("    struct sockaddr_in addr;\n");
+	printf("    memset(&addr, 0, sizeof(addr));\n\n");
+
+	printf("    addr.sin_family = AF_INET;\n");
+	printf("    addr.sin_port = htons(9090);\n");
+	printf("    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);\n\n");
+
+	printf("    if (connect(scfd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {\n");
+	printf("        perror(\"connect to sentry_control failed\");\n");
+	printf("        exit(1);\n");
+	printf("    }\n");
+	printf("}\n\n");	
+
+
+	//socket send helper
+	printf("static int send_buffer(int fd, const void* buf, size_t len) {\n");
+	printf("    const uint8_t* p = (const uint8_t*) buf;\n\n");
+	printf("    while (len > 0) {\n");
+	printf("        ssize_t n = send(fd, p, len, 0);\n");
+	printf("        if (n < 0) {\n");
+	printf("            if (errno == EINTR) continue;\n");
+	printf("            perror(\"send failed\");\n");
+	printf("            return -1;\n");
+	printf("        }\n");
+	printf("        if (n == 0) return -1;\n\n");
+	printf("        p += n;\n");
+	printf("        len -= n;\n");
+	printf("    }\n\n");
+	printf("    return 0;\n");
+	printf("}\n\n");
+
+	//TODO: need individual impl for send and recv over proxy
 	
 
 
 
+	//TODO: use count send to indicate a sentry send or recieve
 	printf("void flush_buffer_final() {\n");
 	printf("    if (bufferPos > 0) {\n");
-	printf("        fwrite(buffer, sizeof(uint64_t), bufferPos, sentry_log_file);\n");
+	//old impl to write to file, change from socket stuff to this to write bytes to a file
+	//printf("        fwrite(buffer, sizeof(uint64_t), bufferPos, sentry_log_file);\n");
+	printf("        uint64_t count = bufferPos;\n");
+	printf("        send_buffer(scfd, &count, sizeof(count));\n");
+	printf("        send_buffer(scfd, buffer, sizeof(uint64_t) * bufferPos);\n");
 	printf("        bufferPos = 0; // Reset counter after flush\n");
 	printf("    }\n");
 	printf("}\n\n");
-
-
-	//TODO: create a struct to send over the network with a flag for it 
-	//contains send or recieve or just a bunch of regular instructions
 
 	//nutered for testing
 	//inlining this function call does not seem to reduce overhead by any amount??	
@@ -131,10 +182,9 @@ void print_header() {
 	printf("    buffer[bufferPos++] = toSend;\n\n");
 	printf("    // If buffer is full, trigger a flush\n");
 	printf("    if (__builtin_expect(bufferPos >= BUFFER_SIZE, 0)) {\n");
-	//TODO: create an instance of the new send struct and instead of writing to a file we should
-	//be writing to a buffer
-	printf("        fwrite(buffer, sizeof(uint64_t), bufferPos, sentry_log_file);\n");
-	printf("        bufferPos = 0;\n");
+	//printf("        fwrite(buffer, sizeof(uint64_t), bufferPos, sentry_log_file);\n");
+	//printf("        bufferPos = 0;\n");
+	printf("        flush_buffer_final();\n");
 	printf("    }\n");
 	printf("}\n\n");
 
@@ -199,8 +249,9 @@ void print_main() {
 
 	printf("    int64_t retval = 0;\n");
 	printf("    init_memory(argv[1]);\n");
-	printf("    sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
-	printf("    //sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
+	//printf("    sentry_log_file = fopen(\"/dev/null\", \"ab\");\n"); //moved for optimization reasons
+	//printf("    //sentry_log_file = fopen(\"new_sentry_trace.log\", \"ab\");\n"); //moved for optimization reasons
+	printf("    init_sc_socket();\n");
 
 	printf("    retval = run_cpu();\n");
 	printf("    return retval;\n");
@@ -344,7 +395,7 @@ int reg_to_index(unsigned int reg) {
         if (reg >= RISCV_REG_X0 && reg <= RISCV_REG_X31) {
                 return reg - RISCV_REG_X0;
         }
-        std::cerr << "register index translation failed\n" << std::endl;
+        std::cerr << "register index translation failed with reg: " << reg << "\n" << std::endl;
         return -1;
 }
 
@@ -535,6 +586,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
+		//mult word
                 case RISCV_INS_MULW: {
                         int rd = reg_to_index(riscv->operands[0].reg);
                         int rs1 = reg_to_index(riscv->operands[1].reg);
@@ -576,6 +628,115 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			}
 			break;
 		}
+
+		//bitwise or 
+		case RISCV_INS_OR: {
+		    int rd = reg_to_index(riscv->operands[0].reg);
+		    int rs1 = reg_to_index(riscv->operands[1].reg);
+		    int rs2 = reg_to_index(riscv->operands[2].reg);
+
+		    if (rd != 0) {
+			printf("    cpu.regs[%d] = cpu.regs[%d] | cpu.regs[%d];\n", rd, rs1, rs2);
+			if (trusted) {
+			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			}
+		    }
+		    break;
+		}
+
+		//bitwise and
+		case RISCV_INS_AND: {
+		    int rd = reg_to_index(riscv->operands[0].reg);
+		    int rs1 = reg_to_index(riscv->operands[1].reg);
+		    int rs2 = reg_to_index(riscv->operands[2].reg);
+
+		    if (rd != 0) {
+			printf("    cpu.regs[%d] = cpu.regs[%d] & cpu.regs[%d];\n", rd, rs1, rs2);
+			if (trusted) {
+			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			}
+		    }
+		    break;
+		}
+
+		//and immediate
+		case RISCV_INS_ANDI: {
+		    int rd = reg_to_index(riscv->operands[0].reg);
+		    int rs1 = reg_to_index(riscv->operands[1].reg);
+		    int64_t imm = riscv->operands[2].imm;
+
+		    if (rd != 0) {
+			printf("    cpu.regs[%d] = cpu.regs[%d] & %ldLL;\n", rd, rs1, imm);
+			if (trusted) {
+			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			}
+		    }
+		    break;
+		}
+
+		//xor immediate
+		case RISCV_INS_XORI: {
+		    int rd = reg_to_index(riscv->operands[0].reg);
+		    int rs1 = reg_to_index(riscv->operands[1].reg);
+		    int64_t imm = riscv->operands[2].imm;
+
+		    if (rd != 0) {
+			printf("    cpu.regs[%d] = cpu.regs[%d] ^ %ldLL;\n", rd, rs1, imm);
+			if (trusted) {
+			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			}
+		    }
+		    break;
+		}
+
+
+		//set letss that unisgned
+		case RISCV_INS_SLTU: {
+		    int rd = reg_to_index(riscv->operands[0].reg);
+
+		    int rs1;
+		    int rs2;
+
+		    if (riscv->op_count == 2) {
+			// Capstone printed pseudo-instruction snez rd, rs1
+			rs1 = 0;
+			rs2 = reg_to_index(riscv->operands[1].reg);
+		    } else {
+			rs1 = reg_to_index(riscv->operands[1].reg);
+			rs2 = reg_to_index(riscv->operands[2].reg);
+		    }
+
+		    if (rd != 0) {
+			printf("    cpu.regs[%d] = ((uint64_t)cpu.regs[%d] < (uint64_t)cpu.regs[%d]);\n", rd, rs1, rs2);
+			if (trusted) {
+			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			}
+		    }
+		    break;
+		}
+
+		//set less than immediate unsigned
+		case RISCV_INS_SLTIU: {
+		    int rd = reg_to_index(riscv->operands[0].reg);
+		    int rs1 = reg_to_index(riscv->operands[1].reg);
+
+		    uint64_t imm = 0;
+
+		    if (riscv->op_count >= 3) {
+			imm = riscv->operands[2].imm;
+		    } else {
+			// Capstone printed pseudo-instruction seqz rd, rs1
+			imm = 1;
+		    }
+
+		    if (rd != 0) {
+			printf("    cpu.regs[%d] = ((uint64_t)cpu.regs[%d] < %luULL);\n", rd, rs1, imm);
+			if (trusted) {
+			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			}
+		    }
+		    break;
+		}	
 
 
                 //branching instructions
@@ -1026,6 +1187,8 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 	//at RIP before entering main, if we see it in a ret, jump here	
 	printf("\nL_RETFROMMAIN:\n");
 	printf("    flush_buffer_final();\n");
+	//close scfd
+	printf("    close(scfd);\n");
 	printf("    return cpu.regs[10];\n");
 	printf("}\n");
 }
