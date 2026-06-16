@@ -45,6 +45,11 @@
 // 4) expand into an example little web server (should do some simple task, implement syscalls and library calls as needed)
 // (HOPEFULLY WE NEVER NEED TO WRITE THE SYSCALL DISPATCHER)
 //
+// TODO for now
+// 1) send and recv helpers for the send and recv calls
+// 2) 
+//
+//
 // GENERAL TODO BEFORE FINAL benchmarks
 // 1) command line arg for trusted on main
 // 2) split print header into seperate functions that better define functionality supported
@@ -655,111 +660,111 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 
 		//bitwise or 
 		case RISCV_INS_OR: {
-		    int rd = reg_to_index(riscv->operands[0].reg);
-		    int rs1 = reg_to_index(riscv->operands[1].reg);
-		    int rs2 = reg_to_index(riscv->operands[2].reg);
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rs2 = reg_to_index(riscv->operands[2].reg);
 
-		    if (rd != 0) {
-			printf("    cpu.regs[%d] = cpu.regs[%d] | cpu.regs[%d];\n", rd, rs1, rs2);
-			if (trusted) {
-			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = cpu.regs[%d] | cpu.regs[%d];\n", rd, rs1, rs2);
+				if (trusted) {
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
 			}
-		    }
-		    break;
+			break;
 		}
 
 		//bitwise and
 		case RISCV_INS_AND: {
-		    int rd = reg_to_index(riscv->operands[0].reg);
-		    int rs1 = reg_to_index(riscv->operands[1].reg);
-		    int rs2 = reg_to_index(riscv->operands[2].reg);
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rs2 = reg_to_index(riscv->operands[2].reg);
 
-		    if (rd != 0) {
-			printf("    cpu.regs[%d] = cpu.regs[%d] & cpu.regs[%d];\n", rd, rs1, rs2);
-			if (trusted) {
-			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+		 	if (rd != 0) {
+				printf("    cpu.regs[%d] = cpu.regs[%d] & cpu.regs[%d];\n", rd, rs1, rs2);
+				if (trusted) {
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
 			}
-		    }
-		    break;
+			break;
 		}
 
 		//and immediate
 		case RISCV_INS_ANDI: {
-		    int rd = reg_to_index(riscv->operands[0].reg);
-		    int rs1 = reg_to_index(riscv->operands[1].reg);
-		    int64_t imm = riscv->operands[2].imm;
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int64_t imm = riscv->operands[2].imm;
 
-		    if (rd != 0) {
-			printf("    cpu.regs[%d] = cpu.regs[%d] & %ldLL;\n", rd, rs1, imm);
-			if (trusted) {
-			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = cpu.regs[%d] & %ldLL;\n", rd, rs1, imm);
+				if (trusted) {
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
 			}
-		    }
-		    break;
+			break;
 		}
 
 		//xor immediate
 		case RISCV_INS_XORI: {
-		    int rd = reg_to_index(riscv->operands[0].reg);
-		    int rs1 = reg_to_index(riscv->operands[1].reg);
-		    int64_t imm = riscv->operands[2].imm;
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
+			int64_t imm = riscv->operands[2].imm;
 
-		    if (rd != 0) {
-			printf("    cpu.regs[%d] = cpu.regs[%d] ^ %ldLL;\n", rd, rs1, imm);
-			if (trusted) {
-			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = cpu.regs[%d] ^ %ldLL;\n", rd, rs1, imm);
+				if (trusted) {
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
 			}
-		    }
-		    break;
+			break;
 		}
 
 
 		//set letss that unisgned
 		case RISCV_INS_SLTU: {
-		    int rd = reg_to_index(riscv->operands[0].reg);
+			int rd = reg_to_index(riscv->operands[0].reg);
 
-		    int rs1;
-		    int rs2;
+			int rs1;
+			int rs2;
 
-		    if (riscv->op_count == 2) {
-			// Capstone printed pseudo-instruction snez rd, rs1
-			rs1 = 0;
-			rs2 = reg_to_index(riscv->operands[1].reg);
-		    } else {
-			rs1 = reg_to_index(riscv->operands[1].reg);
-			rs2 = reg_to_index(riscv->operands[2].reg);
-		    }
-
-		    if (rd != 0) {
-			printf("    cpu.regs[%d] = ((uint64_t)cpu.regs[%d] < (uint64_t)cpu.regs[%d]);\n", rd, rs1, rs2);
-			if (trusted) {
-			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			if (riscv->op_count == 2) {
+				// Capstone printed pseudo-instruction snez rd, rs1
+				rs1 = 0;
+				rs2 = reg_to_index(riscv->operands[1].reg);
+			} else {
+				rs1 = reg_to_index(riscv->operands[1].reg);
+				rs2 = reg_to_index(riscv->operands[2].reg);
 			}
-		    }
-		    break;
+
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = ((uint64_t)cpu.regs[%d] < (uint64_t)cpu.regs[%d]);\n", rd, rs1, rs2);
+				if (trusted) {
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
+			}
+			break;
 		}
 
 		//set less than immediate unsigned
 		case RISCV_INS_SLTIU: {
-		    int rd = reg_to_index(riscv->operands[0].reg);
-		    int rs1 = reg_to_index(riscv->operands[1].reg);
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int rs1 = reg_to_index(riscv->operands[1].reg);
 
-		    uint64_t imm = 0;
+			uint64_t imm = 0;
 
-		    if (riscv->op_count >= 3) {
-			imm = riscv->operands[2].imm;
-		    } else {
-			// Capstone printed pseudo-instruction seqz rd, rs1
-			imm = 1;
-		    }
-
-		    if (rd != 0) {
-			printf("    cpu.regs[%d] = ((uint64_t)cpu.regs[%d] < %luULL);\n", rd, rs1, imm);
-			if (trusted) {
-			    printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+			if (riscv->op_count >= 3) {
+				imm = riscv->operands[2].imm;
+			} else {
+				// Capstone printed pseudo-instruction seqz rd, rs1
+				imm = 1;
 			}
-		    }
-		    break;
+
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = ((uint64_t)cpu.regs[%d] < %luULL);\n", rd, rs1, imm);
+				if (trusted) {
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
+			}
+			break;
 		}	
 
 
@@ -925,8 +930,8 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                                 //just a regular jump (no link)
                                 uint64_t target = get_branch_target(insn);
 				if (trusted) {
-					printf("    send_to_sentry(TAKEN);\n");
-					printf("    send_to_sentry(0x%lx);\n", target);
+					printf("      send_to_sentry(TAKEN);\n");
+					printf("      send_to_sentry(0x%lx);\n", target);
 				}
                                 printf("    goto L_0x%lx;\n", target);
                         }
@@ -942,7 +947,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			//just send the value
                         printf("    *(int64_t*)(memory + cpu.regs[%d] + %ld) = cpu.regs[%d];\n", base_reg, offset, rs2);
 			if (trusted) {
-				printf("    send_to_sentry(cpu.regs[%d]);\n", rs2);
+				printf("      send_to_sentry(cpu.regs[%d]);\n", rs2);
 			}
                         break;
                 }
@@ -955,7 +960,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			//just send value
                         printf("    *(int32_t*)(memory + cpu.regs[%d] + %ld) = (int32_t)(cpu.regs[%d]);\n", base_reg, offset, rs2);
 			if (trusted) {
-				printf("    send_to_sentry((uint32_t)(int32_t)cpu.regs[%d]);\n", rs2);
+				printf("      send_to_sentry((uint32_t)(int32_t)cpu.regs[%d]);\n", rs2);
 			}
                         break;
                 }
@@ -969,7 +974,7 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 			if (rd != 0) {
                         	printf("    cpu.regs[%d] = *(int64_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
 				if (trusted) {
-					printf("    send_to_sentry(cpu.regs[%d]);\n", rd);
+					printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
 				}
 			}
                         break;
