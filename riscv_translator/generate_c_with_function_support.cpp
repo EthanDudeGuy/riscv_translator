@@ -10,6 +10,7 @@
 // 4) investigate performance improvement from utilizing vectored instructions in RISC-V (is this worth it?????? do this last!!!!!!)
 // 5) possibly investigate the legitness of only sending some intermediate instructions and triggering panics through detecting divergence in the final 
 // results of basic blocks
+// 6) find a better way to pre load values that doesnt require reading in the origional elf at runtime
 // 
 //
 // OPTIMATIONS DONE THAT NEED TO BE BENCHMARKED (IN ADDITION TO THOSE ABOVE)
@@ -43,6 +44,13 @@
 // 	picture on phone for this one)
 // 4) expand into an example little web server (should do some simple task, implement syscalls and library calls as needed)
 // (HOPEFULLY WE NEVER NEED TO WRITE THE SYSCALL DISPATCHER)
+//
+// GENERAL TODO BEFORE FINAL benchmarks
+// 1) command line arg for trusted on main
+// 2) split print header into seperate functions that better define functionality supported
+//
+//
+//
 //--------------------------------------------NOTES ^^^^-------------------------------------------------------------------------------------//
 
 #include <stdio.h>
@@ -100,25 +108,38 @@ void print_header() {
 	printf("    int64_t regs[32];\n\n");
 	printf("} RegisterFile;\n\n");
 
-	//create variables for the memory pointer
-        printf("uint8_t* memory = NULL;\n");
-	printf("\n");
-
 
 	//buffer for holding results before sending
 	//and global to track how full it is
 	printf("#define BUFFER_SIZE 8192\n"); //64 KB
 	printf("#define BUFFER_FLUSH_MARGIN 64\n");
 	printf("#define TAKEN 0\n");
-       	printf("#define NOTTAKEN 1\n");	
+       	printf("#define NOTTAKEN 1\n\n");
+
+	//tags for sentry control packet headers
+	printf("#define PKT_TRACE 1\n");
+	printf("#define PKT_SEND 2\n");
+	printf("#define PKT_RECV 3\n\n");
+	
+	//header for sc send packet type indicates traces or send/recv
+	printf("typedef struct {\n");
+	printf("    uint64_t type;\n");
+	printf("    uint64_t count;\n");
+	printf("} scPacketHeader;\n");
+
+
+	//create variables for the memory pointer
+        printf("uint8_t* memory = NULL;\n");
 	printf("uint64_t buffer[BUFFER_SIZE];\n");
 	printf("int bufferPos = 0;\n");
 	//for test writing to a log file
 	//printf("static FILE* sentry_log_file = NULL;\n");
-	//
-	//for actual network coms file descriptor (sentry control FD)
-	printf("static int scfd = -1;\n");
 	
+	//for actual network coms file descriptor (sentry control FD)
+	printf("static int scfd = -1;\n\n");
+	
+
+
 	//socket initi for sc living on 9090
 	printf("void init_sc_socket(void) {\n");
 	printf("    scfd = socket(AF_INET, SOCK_STREAM, 0);\n");
@@ -166,11 +187,14 @@ void print_header() {
 	//TODO: use count send to indicate a sentry send or recieve
 	printf("void flush_buffer_final() {\n");
 	printf("    if (bufferPos > 0) {\n");
-	//old impl to write to file, change from socket stuff to this to write bytes to a file
-	//printf("        fwrite(buffer, sizeof(uint64_t), bufferPos, sentry_log_file);\n");
-	printf("        uint64_t count = bufferPos;\n");
-	printf("        send_buffer(scfd, &count, sizeof(count));\n");
-	printf("        send_buffer(scfd, buffer, sizeof(uint64_t) * bufferPos);\n");
+	printf("        scPacketHeader header;\n\n");
+
+	printf("        header.type = PKT_TRACE;\n");
+	printf("        header.count = bufferPos;\n\n");
+
+	printf("        send_buffer(scfd, &header, sizeof(header));\n");
+	printf("        send_buffer(scfd, buffer, sizeof(uint64_t) * bufferPos);\n\n");
+
 	printf("        bufferPos = 0; // Reset counter after flush\n");
 	printf("    }\n");
 	printf("}\n\n");
