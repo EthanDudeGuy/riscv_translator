@@ -184,9 +184,27 @@ void print_header() {
 	printf("    return 0;\n");
 	printf("}\n\n");
 
-	//TODO: need individual impl for send and recv over proxy
-	
+	//socket recv helper
+	printf("static int recv_buffer(int fd, void* buf, size_t len) {\n");
+	printf("    uint8_t* p = (uint8_t*)buf;\n\n");
 
+	printf("    while (len > 0) {\n");
+	printf("        ssize_t n = recv(fd, p, len, 0);\n\n");
+
+	printf("        if (n < 0) {\n");
+	printf("            if (errno == EINTR) continue;\n");
+	printf("            perror(\"recv failed\");\n");
+	printf("            return -1;\n");
+	printf("        }\n\n");
+
+	printf("        if (n == 0) return -1;\n\n");
+
+	printf("        p += n;\n");
+	printf("        len -= n;\n");
+	printf("    }\n\n");
+
+	printf("    return 0;\n");
+	printf("}\n\n");	
 
 
 	//TODO: use count send to indicate a sentry send or recieve
@@ -202,6 +220,42 @@ void print_header() {
 
 	printf("        bufferPos = 0; // Reset counter after flush\n");
 	printf("    }\n");
+	printf("}\n\n");
+
+
+	//implementation for sending over the network
+	printf("void sc_send_payload(void* data, uint64_t len) {\n");
+	printf("    scPacketHeader header;\n\n");
+
+	printf("    flush_buffer_final();\n\n");
+
+	printf("    header.type = PKT_SEND;\n");
+	printf("    header.count = len;\n\n");
+
+	printf("    send_buffer(scfd, &header, sizeof(header));\n");
+	printf("    send_buffer(scfd, data, len);\n");
+	printf("}\n\n");
+
+	//implementation for recvieving over the network
+	printf("uint64_t sc_recv_payload(void* dst, uint64_t max_len) {\n");
+	printf("    scPacketHeader header;\n");
+	printf("    uint64_t actual_len = 0;\n\n");
+
+	printf("    flush_buffer_final();\n\n");
+
+	printf("    header.type = PKT_RECV;\n");
+	printf("    header.count = max_len;\n\n");
+
+	printf("    send_buffer(scfd, &header, sizeof(header));\n\n");
+
+	printf("    recv_buffer(scfd, &actual_len, sizeof(actual_len));\n");
+	printf("    if (actual_len > max_len) {\n");
+	printf("        fprintf(stderr, \"sentry recv returned too many bytes\\n\");\n");
+	printf("        exit(1);\n");
+	printf("    }\n");
+	printf("    recv_buffer(scfd, dst, actual_len);\n\n");
+
+	printf("    return actual_len;\n");
 	printf("}\n\n");
 
 	//nutered for testing
@@ -965,6 +1019,20 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
                         break;
                 }
 
+		//store byte
+		case RISCV_INS_SB: {
+			int rs2 = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+
+			printf("    *(uint8_t*)(memory + cpu.regs[%d] + %ld) = (uint8_t)cpu.regs[%d];\n", base_reg, offset, rs2);
+			if (trusted) {
+				printf("      send_to_sentry((uint8_t)cpu.regs[%d]);\n", rs2);
+			}
+			break;
+		}
+
+
                 //load double instruction
                 case RISCV_INS_LD: {
                         int rd = reg_to_index(riscv->operands[0].reg);
@@ -1067,7 +1135,10 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 //used to determine if we are replacing
 bool is_replaceable_function(std::string func_name) {
 	printf("//--CALL TO FUNCTION NAMED: %s ------------------\n", func_name.c_str());
-	return  (func_name == "printf@plt" || func_name == "puts@plt");
+	return  (func_name == "printf@plt" 
+		|| func_name == "puts@plt"
+		|| func_name == "send@plt"
+		|| func_name == "recv@plt");
 }
 
 void replace_function(std::string func_name) {
@@ -1079,12 +1150,27 @@ void replace_function(std::string func_name) {
 		printf("            cpu.regs[10] = 0; \n");
 		printf("        }\n");
 	} else if (func_name == "puts@plt") {
-
 		printf("        // Library Call to puts\n");
 		printf("        {\n");
 		printf("            char* str = (char*)(memory + cpu.regs[10]);\n");
 		printf("            int ret = puts(str);\n");
 		printf("            cpu.regs[10] = ret;\n");
+		printf("        }\n");
+	} else if (func_name == "send@plt") {
+		printf("	// Library call to send\n");
+		printf("        {\n");
+		printf("            void* buf = memory + cpu.regs[11];\n");
+		printf("            uint64_t len = cpu.regs[12];\n");
+		printf("            sc_send_payload(buf, len);\n");
+		printf("            cpu.regs[10] = len;\n"); //bytes sent
+		printf("        }\n");
+	} else if (func_name == "recv@plt") {
+		printf("        // Library Call to recv\n");
+		printf("        {\n");
+		printf("            void* buf = memory + cpu.regs[11];\n");
+		printf("            uint64_t max_len = cpu.regs[12];\n");
+		printf("            uint64_t actual_len = sc_recv_payload(buf, max_len);\n");
+		printf("            cpu.regs[10] = actual_len;\n");
 		printf("        }\n");
 	}
 
