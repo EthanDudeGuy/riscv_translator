@@ -114,6 +114,8 @@ static int connect_proxy(void) {
 int main(void) {
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
+    uint64_t total_values_received = 0;
+
     if (listenfd < 0) {
         perror("socket");
         return 1;
@@ -166,6 +168,9 @@ int main(void) {
         printf("Count: %lu\n", header.count);
 
         if (header.type == PKT_TRACE) {
+
+            total_values_received += header.count;
+
             for (uint64_t i = 0; i < header.count; i++) {
                 uint64_t value;
 
@@ -229,7 +234,7 @@ int main(void) {
 
             free(buf);
         } else {
-            printf("Unknown packet type. Stopping to avoid stream desync.\n");
+            printf("Unknown packet type");
             break;
         }
     }
@@ -237,6 +242,7 @@ int main(void) {
 done:
     printf("\nConnection closed\n");
 
+    printf("\nTotal trace values received: %lu\n", total_values_received);
     close(proxyfd);
     close(clientfd);
     close(listenfd);

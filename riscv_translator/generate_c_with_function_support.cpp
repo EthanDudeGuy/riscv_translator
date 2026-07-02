@@ -80,7 +80,8 @@ struct SymbolInfo {
 //tag to tell run_cpu function if we are sending to sentry
 bool trusted = true;
 
-
+//tag to tell translator not to instrument main if --main-untrusted present
+bool mainUnt = false;
 
 //print the C header for the stuff we need to run
 void print_header() {
@@ -1130,9 +1131,8 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 
 }
 
-//TODO: when implementing additional external instructions, put name from 
-//PLT into return statement and then place implementation into replace_function
-//used to determine if we are replacing
+//to support a library function put its name in this conditional as <name>@plt and then
+//add implementation to the function 'replace_function' below
 bool is_replaceable_function(std::string func_name) {
 	printf("//--CALL TO FUNCTION NAMED: %s ------------------\n", func_name.c_str());
 	return  (func_name == "printf@plt" 
@@ -1192,7 +1192,7 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 			SymbolInfo info = symbols[address];
 			
 			//set the mode
-			trusted = (info.name.rfind("TGtrusted.", 0) == 0 || info.name == "main");
+			trusted = (info.name.rfind("TGtrusted.", 0) == 0 || (info.name == "main" && !mainUnt));
 
 			if (info.name == "_start" || info.name == "deregister_tm_clones" || 
 			    info.name == "register_tm_clones" || info.name == "__do_global_dtors_aux" || 
@@ -1226,10 +1226,48 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 
 		if (!cs_disasm_iter(handle, &code_ptr, &code_size, &address, insn)) {
 			// Handle custom
+
+			uint32_t raw =
+			    ((uint32_t)code_ptr[0]) |
+			    ((uint32_t)code_ptr[1] << 8) |
+			    ((uint32_t)code_ptr[2] << 16) |
+			    ((uint32_t)code_ptr[3] << 24);
+
+			uint32_t opcode =  raw        & 0x7f;
+			uint32_t rd     = (raw >> 7)  & 0x1f;
+			uint32_t funct3 = (raw >> 12) & 0x7;
+			uint32_t rs1    = (raw >> 15) & 0x1f;
+			
+			printf("// CUSTOM INSTRUCTION: %02x %02x %02x %02x\n",
+				   code_ptr[0],
+				   code_ptr[1],
+				   code_ptr[2],
+				   code_ptr[3]);
+			printf("//opcode: x%u, func3: x%u\n", opcode, funct3);
+
+			if (opcode == 0x0b && funct3 == 0x3) {
+				printf("//ENCOUNTERED SENTRY PUT with rs1 = %u\n", rs1);
+				printf("    {\n");
+				printf("        uint64_t send_value = (uint64_t)cpu.regs[%u];\n", rs1);
+				printf("        sc_send_payload(&send_value, sizeof(send_value));\n");
+				printf("    }\n");
+			} else if (opcode == 0x0b && funct3 == 0x4) {
+				printf("//ENCOUNTERED SENTRY get with rd = %u\n", rd);
+				if (rd != 0) {
+					printf("    {\n");
+					printf("        uint64_t sentry_value = 0;\n");
+					printf("        sc_recv_payload(&sentry_value, sizeof(sentry_value));\n");
+					printf("        cpu.regs[%u] = (int64_t)sentry_value;\n", rd);
+					if (trusted) {
+						printf("        send_to_sentry(cpu.regs[%u]);\n", rd);
+					}
+					printf("    }\n");
+				}
+			}
+
 			code_ptr += 4;
 			code_size -= 4;
 			address += 4;
-			printf("//-------------CUSTOM INSTRUCTION ENCOUNTERED------------\n");
 			continue;
         	}
 
@@ -1313,9 +1351,16 @@ void print_run_cpu(csh handle, const uint8_t *code_ptr, size_t code_size, uint64
 
 int main(int argc, char** argv) {
         if (argc < 2) {
-                perror("Usage: ./translator <riscv_elf>\n");
+                perror("Usage: ./translator <riscv_elf> [--main-untrusted] <>\n");
                 return 1;
         }
+
+	if (argc == 3) {
+		if (strcmp(argv[2],"--main-untrusted") == 0) {
+			mainUnt = true;
+			std::cerr << "set main untrusted" << std::endl;
+		}
+	}
 
 	//LOOKING AT THE WHOLE ELF
 	int fd = open(argv[1], O_RDONLY);
