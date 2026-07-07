@@ -261,7 +261,7 @@ void print_init_memory() {
 	printf("void init_memory(const char* elf_path) {\n");
 	printf("    uint64_t max_loaded_end = 0;\n"); //keep track of where PT_LOAD ends so I can make a heap
 	printf("    uint64_t heap_start = 0;\n"); //start of heap
-	printf("    uint64_t heap_end = 70000000ULL;\n\n"); //end of heap 
+	printf("    uint64_t heap_end = 0x70000000ULL;\n\n"); //end of heap 
 
 	printf("    // 1. Reserve 4GB virtual address space\n");
 	printf("    memory = mmap(NULL, 0x100000000, PROT_READ | PROT_WRITE, \n");
@@ -811,7 +811,37 @@ void translate_to_c(csh handle, cs_insn *insn, std::set<uint64_t>& targets, uint
 				}
 			}
 			break;
+		}
+
+
+		case RISCV_INS_LBU: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = *(uint8_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
+				if (trusted) {
+			    		printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
+			}
+			break;
 		}	
+
+
+		case RISCV_INS_LB: {
+			int rd = reg_to_index(riscv->operands[0].reg);
+			int base_reg = reg_to_index(riscv->operands[1].mem.base);
+			int64_t offset = riscv->operands[1].mem.disp;
+
+			if (rd != 0) {
+				printf("    cpu.regs[%d] = (int64_t)*(int8_t*)(memory + cpu.regs[%d] + %ld);\n", rd, base_reg, offset);
+				if (trusted) {
+			    		printf("      send_to_sentry(cpu.regs[%d]);\n", rd);
+				}
+		    	}
+			break;
+		}		      
 
 
                 //branching instructions
@@ -1131,7 +1161,8 @@ bool is_replaceable_function(std::string func_name) {
 		|| func_name == "send@plt"
 		|| func_name == "recv@plt"
 		|| func_name == "malloc@plt"
-		|| func_name == "free@plt");
+		|| func_name == "free@plt"
+		|| func_name == "memset@plt");
 }
 
 void replace_function(std::string func_name) {
@@ -1139,7 +1170,8 @@ void replace_function(std::string func_name) {
 		printf("        // Library Call to printf\n");
 		printf("        {\n");
 		printf("            char* fmt = (char*)(memory + cpu.regs[10]);\n");
-		printf("            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], cpu.regs[14]);\n");
+		//hardcoded cpureg[14] as stringpointer for malloc test (avoids strlen issues inside malloc)
+		printf("            printf(fmt, cpu.regs[11], cpu.regs[12], cpu.regs[13], (char*)(memory + cpu.regs[14]));\n");
 		printf("            cpu.regs[10] = 0; \n");
 		printf("        }\n");
 	} else if (func_name == "puts@plt") {
@@ -1173,6 +1205,8 @@ void replace_function(std::string func_name) {
 		printf("        // Library Call to malloc -> bound_malloc\n");
 		printf("        {\n");
 		printf("            void* p = bound_malloc((size_t)cpu.regs[10]);\n");
+		//printf("            printf(\"malloc returned %%p\\n\", p);\n");
+		//printf("            printf(\"guest pointer = 0x%%lx\\n\", (uint8_t*)p - memory);\n");	
 		printf("            if (p == NULL) {\n");
 		printf("                cpu.regs[10] = 0;\n");
 		printf("            } else {\n");
@@ -1188,7 +1222,16 @@ void replace_function(std::string func_name) {
 		printf("                bound_free(p);\n");
 		printf("            }\n");
 		printf("        }\n");
-	}		
+	} else if (func_name == "memset@plt") {
+		printf("        // Library Call to memset\n");
+		printf("        {\n");
+		printf("            void *dst = memory + cpu.regs[10];\n");
+		printf("            int value = (int)cpu.regs[11];\n");
+		printf("            size_t len = (size_t)cpu.regs[12];\n");
+		printf("            memset(dst, value, len);\n");
+		printf("            cpu.regs[10] = cpu.regs[10];\n");
+		printf("        }\n");	
+	}
 		
 
 }
