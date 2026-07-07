@@ -13,46 +13,10 @@
 // 6) find a better way to pre load values that doesnt require reading in the origional elf at runtime
 // 
 //
-// OPTIMATIONS DONE THAT NEED TO BE BENCHMARKED (IN ADDITION TO THOSE ABOVE)
-// 1) Going from no inlining to inlining on send_to_sentry
-// 2) __builtin_expect on send_to_sentry buffer flush checks
-// 
-//
-//
 // OPTIMIZATIONS THAT REALLY CANT BE QUANITITATIVELY TESTED BUT SHOULD BE DISCUSSED
 // 1) Goto's only where they are absolutely necessary and nowhere else (dont pollute ????? something)
 // 2) linking dynamically with external libraries and implementing their replacements manually in code
 // rather than statically linking and translating the entire standard library (we cant controll how that was compiled)
-// 3) 
-//
-//
-// THINGS TO THINK THROUGH
-// 1) is malloc actually an issue? if I call malloc I get a pointer, and then I can store it into my registers or my
-// memory, but then when it is accessed the program thinks thats a pointer to the fake memory space, so I should copy over everything
-// from the heap onto my heap and then do malloc memory management myself? Maybe the only real solution here is to write a custom malloc that gets 
-// fully translated.
-// 2)
-//
-//
-//
-// THINGS TO DO FOR THE SC AND NETWORK PROXY PART
-// 1) implement library with send and recv calls (dont have to do anything)
-// 2) implement replacement (TM) for there calls that send specific packages to the SC with special IDs
-// 	-considder what beard said about bundling data together so the sentry doesnt have to process every instruction
-// 3) implement proxy server that calls all relative networking calls and statically connects to another machine (fake example client???)
-// 	on this machine calls to send and recieve should be triggered by recieving a certain struct from SC unit over socket (look ar 
-// 	picture on phone for this one)
-// 4) expand into an example little web server (should do some simple task, implement syscalls and library calls as needed)
-// (HOPEFULLY WE NEVER NEED TO WRITE THE SYSCALL DISPATCHER)
-//
-// TODO for now
-// 1) send and recv helpers for the send and recv calls
-// 2) 
-//
-//
-// GENERAL TODO BEFORE FINAL benchmarks
-// 1) command line arg for trusted on main
-// 2) split print header into seperate functions that better define functionality supported
 //
 //
 //
@@ -77,7 +41,7 @@ struct SymbolInfo {
 	uint64_t size;
 };
 
-//tag to tell run_cpu function if we are sending to sentry
+//tag to tell run_cpu function if we are sending to sentry for a given instruction
 bool trusted = true;
 
 //tag to tell translator not to instrument main if --main-untrusted present
@@ -99,6 +63,8 @@ void print_header() {
 	printf("#include <arpa/inet.h>\n");
 	printf("#include <errno.h>\n");
 	printf("#include <string.h>\n");
+	//trusted allocator library
+	printf("#include \"/home/trustguard/oldStuff/liberty/projects/emuchecker/lib/tg_trusted_alloc.h\"\n");
 
         printf("// Global RV64 State\n");
 	
@@ -207,8 +173,7 @@ void print_header() {
 	printf("    return 0;\n");
 	printf("}\n\n");	
 
-
-	//TODO: use count send to indicate a sentry send or recieve
+	//called to construct trace send packet and then flush the buffer
 	printf("void flush_buffer_final() {\n");
 	printf("    if (bufferPos > 0) {\n");
 	printf("        scPacketHeader header;\n\n");
@@ -259,17 +224,32 @@ void print_header() {
 	printf("    return actual_len;\n");
 	printf("}\n\n");
 
-	//nutered for testing
-	//inlining this function call does not seem to reduce overhead by any amount??	
+	//actual send of trace buffer
 	printf("static inline __attribute__((always_inline))\n");
 	printf("void send_to_sentry(uint64_t toSend) {\n");
 	printf("    buffer[bufferPos++] = toSend;\n\n");
 	printf("    // If buffer is full, trigger a flush\n");
 	printf("    if (__builtin_expect(bufferPos >= BUFFER_SIZE, 0)) {\n");
-	//printf("        fwrite(buffer, sizeof(uint64_t), bufferPos, sentry_log_file);\n");
-	//printf("        bufferPos = 0;\n");
 	printf("        flush_buffer_final();\n");
 	printf("    }\n");
+	printf("}\n\n");
+
+	//initialization function for the heap
+	printf("void init_bound_allocator(uint64_t heap_start_guest, uint64_t heap_end_guest) {\n");
+	printf("    heap_start_guest = ALIGN(heap_start_guest);\n\n");
+
+	printf("    if (heap_start_guest >= heap_end_guest) {\n");
+	printf("	fprintf(stderr, \"invalid heap region\\n\");\n");
+	printf("	exit(1);\n");
+	printf("    }\n\n");
+
+	printf("    flp first = (flp)(memory + heap_start_guest);\n\n");
+
+	printf("    first->size = heap_end_guest - heap_start_guest;\n");
+	printf("    first->next = NULL;\n\n");
+
+	printf("    TG_ALLOC_HEAD__.size = 0;\n");
+	printf("    TG_ALLOC_HEAD__.next = first;\n");
 	printf("}\n\n");
 
 	printf("\n");
@@ -279,6 +259,10 @@ void print_header() {
 //prints logic to set up the memory space and read in the PTLOAD sections of the ELF
 void print_init_memory() {
 	printf("void init_memory(const char* elf_path) {\n");
+	printf("    uint64_t max_loaded_end = 0;\n"); //keep track of where PT_LOAD ends so I can make a heap
+	printf("    uint64_t heap_start = 0;\n"); //start of heap
+	printf("    uint64_t heap_end = 70000000ULL;\n\n"); //end of heap 
+
 	printf("    // 1. Reserve 4GB virtual address space\n");
 	printf("    memory = mmap(NULL, 0x100000000, PROT_READ | PROT_WRITE, \n");
 	printf("                  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);\n");
@@ -316,10 +300,19 @@ void print_init_memory() {
 	printf("            lseek(fd, phdrs[i].p_offset, SEEK_SET);\n");
 	printf("            if (read(fd, &memory[phdrs[i].p_vaddr], phdrs[i].p_filesz) != phdrs[i].p_filesz) {\n");
 	printf("                fprintf(stderr, \"Error loading segment %%d\\n\", i); exit(1);\n");
-	printf("            }\n");
+	printf("            }\n\n");
 	//printf("            printf(\"[Loader] Loaded segment at 0x%%08lx\\n\", phdrs[i].p_vaddr);\n");
+	printf("	    //update max_loaded_seg, we will use to find a safe area for the heap\n");
+	printf("            uint64_t seg_end = phdrs[i].p_vaddr + phdrs[i].p_memsz;\n\n");
+	printf("            if (seg_end > max_loaded_end) {\n");
+	printf("            	max_loaded_end = seg_end;\n");
+	printf("    	    }\n");	
 	printf("        }\n");
-	printf("    }\n");
+	printf("    }\n\n");
+
+	printf("    heap_start = max_loaded_end;\n");
+	printf("    init_bound_allocator(heap_start, heap_end);\n");
+
 	printf("    free(phdrs);\n");
 	printf("    close(fd);\n");
 	printf("}\n\n");
@@ -358,10 +351,8 @@ std::map<uint64_t, SymbolInfo> collect_symbols(uint8_t* elf_start) {
 	uint64_t plt_base_addr = 0;
 
 	//find the section headers
-	//TODO: maybe expand this function to do the logic that locates the text section (currently handled by main)
 	for (int i = 0; i < ehdr->e_shnum; i++) {
-		//SHT_SYMTAB (static symbols) or SHT_DYNSYM (dynamic symbols)
-		
+		//SHT_SYMTAB (static symbols) or SHT_DYNSYM (dynamic symbols)	
 		std::string sname = shstrtab + shdrs[i].sh_name;
 		if (sname == ".plt") {
 			plt_base_addr = shdrs[i].sh_addr;
@@ -1138,7 +1129,9 @@ bool is_replaceable_function(std::string func_name) {
 	return  (func_name == "printf@plt" 
 		|| func_name == "puts@plt"
 		|| func_name == "send@plt"
-		|| func_name == "recv@plt");
+		|| func_name == "recv@plt"
+		|| func_name == "malloc@plt"
+		|| func_name == "free@plt");
 }
 
 void replace_function(std::string func_name) {
@@ -1157,6 +1150,7 @@ void replace_function(std::string func_name) {
 		printf("            cpu.regs[10] = ret;\n");
 		printf("        }\n");
 	} else if (func_name == "send@plt") {
+		//not actually what should be used in execution, we should use the sentry builtins
 		printf("	// Library call to send\n");
 		printf("        {\n");
 		printf("            void* buf = memory + cpu.regs[11];\n");
@@ -1165,6 +1159,7 @@ void replace_function(std::string func_name) {
 		printf("            cpu.regs[10] = len;\n"); //bytes sent
 		printf("        }\n");
 	} else if (func_name == "recv@plt") {
+		//not actually what should be used in execution, we should use the sentry builtins
 		printf("        // Library Call to recv\n");
 		printf("        {\n");
 		printf("            void* buf = memory + cpu.regs[11];\n");
@@ -1172,7 +1167,29 @@ void replace_function(std::string func_name) {
 		printf("            uint64_t actual_len = sc_recv_payload(buf, max_len);\n");
 		printf("            cpu.regs[10] = actual_len;\n");
 		printf("        }\n");
-	}
+	} else if (func_name == "malloc@plt") {
+		//malloc -> bound malloc, returns a pointer inside our fake address space
+		//we then convert to the relativve address from our fake address space start (memory)
+		printf("        // Library Call to malloc -> bound_malloc\n");
+		printf("        {\n");
+		printf("            void* p = bound_malloc((size_t)cpu.regs[10]);\n");
+		printf("            if (p == NULL) {\n");
+		printf("                cpu.regs[10] = 0;\n");
+		printf("            } else {\n");
+		printf("                cpu.regs[10] = (uint8_t*)p - memory;\n");
+		printf("            }\n");
+		printf("        }\n");
+	} else if (func_name == "free@plt") {
+		//reverse conversion
+		printf("        // Library Call to free -> bound_free\n");
+		printf("        {\n");
+		printf("            if (cpu.regs[10] != 0) {\n");
+		printf("                void* p = memory + cpu.regs[10];\n");
+		printf("                bound_free(p);\n");
+		printf("            }\n");
+		printf("        }\n");
+	}		
+		
 
 }
 
